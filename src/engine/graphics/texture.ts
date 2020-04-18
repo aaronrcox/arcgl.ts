@@ -20,7 +20,7 @@ export class Texture2D implements ITexture2d {
         return this.image.height;
     }
 
-    constructor(private gl: WebGL2RenderingContext) {
+    constructor(protected gl: WebGL2RenderingContext) {
         this.image = new Image();
     }
 

@@ -145,7 +145,8 @@ class Tile {
     private moveToTargetPos(dt: number) {
         if(this.isMovingToTarget === false)
             return;
-        const speed = 8;
+            
+        const speed = 6;
         const moveDir = Vec2.sub(this.targetPos, this.pos).normalise();
         this.pos.add({x: moveDir.x * dt * this.size.x * speed, y: moveDir.y * dt * this.size.y * speed});
 

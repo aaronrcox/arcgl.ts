@@ -46,7 +46,6 @@ window.onload = (() => {
             menuList.classList.remove('open');
         }
         console.log('clicky');
-        
     })
 
 }

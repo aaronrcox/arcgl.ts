@@ -19,6 +19,7 @@
             margin: 0px;
             background: rgb(32,44,55);
             background: radial-gradient(circle, rgba(32,44,55,1) 0%, rgba(5,10,16,1) 100%);
+            overflow-x: hidden;
         }
 
         canvas {
@@ -31,7 +32,9 @@
             top: 0;
             left: 0;
             color: whitesmoke;
-            padding: 20px;
+            padding: 20px;            
+            background: rgba(0,0,0,0.75);
+            width: 100%;
         }
 
         .page-nav a {
@@ -45,18 +48,21 @@
         .page-nav ul {
             list-style: none;
             padding: 0px;
+            margin: 0px;
+            margin-top:20px;
             transition: all .5s ease-in-out;
             position: absolute;
             width: 300px;
             left: 0px;
             opacity: 0;
             pointer-events: none;
+            background:rgba(0, 0, 0, 0.75);
         }
 
         .page-nav ul.open {
             left: 20px;
             opacity: 1;
-            pointer-events:unset;
+            pointer-events: all;
         }
 
         .page-nav ul li {
@@ -153,10 +159,11 @@
                 <li><a href="#">Project on Github</a></li>
                 <li><a href="#LightBender">Light Bender</a></li>
                 <li><a href="#RayCastingDemo">Ray Cast</a></li>
+                <li><a href="#RenderTextureDemo">Render to Texture</a></li>
                 
             </ul>
         </nav>
 
-        <script src="index.ts"></script>
+        <script src="./index.ts"></script>
   </body>
 </html>

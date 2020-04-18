@@ -3,6 +3,7 @@ import { Vec2, IVec2, IVec3, Vec4, IVec4, Mat4, Rect } from '../math';
 import { ITexture2d, Texture2D } from './texture';
 import { Shader } from './shader';
 import { Mat3 } from '../math/mat3';
+import { RenderTexture } from './renderTexture';
 
 export enum RenderMode {
     FILL,
@@ -260,7 +261,7 @@ class SpriteBuffer
 interface IRenderState2D {
     color: IVec4[];
     uvRect?: Rect;
-    texture?: Texture2D,
+    texture?: ITexture2d,
     lineThickness?: number,
     renderMode?: RenderMode,
 }
@@ -293,9 +294,6 @@ export class Renderer2d {
 
         this.saveState(true);
 
-        // setup 2d projection matrix
-        this.projection = Mat4.orthographicProjection(0, this.canvas.width, this.canvas.height, 0, 0, 100);
-        
         // load shader
         this.shader = new Renderer2DSpriteShader(this.gl);
 
@@ -312,6 +310,12 @@ export class Renderer2d {
         this.processingRender = true;
         this.spriteBuffer.clear();
         this.currentTextureId = 0;
+
+        const renderTarget = RenderTexture.currentRenderTarget();
+
+        // setup 2d projection matrix
+        if(renderTarget == null) this.projection = Mat4.orthographicProjection(0, this.canvas.width, this.canvas.height, 0, 0, 100);
+        else this.projection = Mat4.orthographicProjection(0, renderTarget.width, renderTarget.height, 0, 0, 100);
 
         this.gl.enable(this.gl.BLEND);
         this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
@@ -447,8 +451,12 @@ export class Renderer2d {
            this.spriteBuffer.saveFace(i0, i0+i, i0+i+1);
         }
     }
-
-    setTexture(texture: Texture2D) {
+    
+    clear(r: number = 1, b: number = 1, g: number = 1, a: number = 1 ) {
+        this.gl.clearColor(r, g, b, a);
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    }
+    setTexture(texture: ITexture2d) {
         const state = this.renderState[this.renderState.length - 1];
         state.texture = texture;
     }

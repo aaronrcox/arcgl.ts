@@ -7,6 +7,7 @@
   "scripts": {
     "start": "parcel serve ./src/index.html",
     "build": "parcel build ./src/index.html --public-url https://aaronrcox.github.io/arcgl.ts/",
+    "predeploy": "npm run build ./src/index.html --public-url https://aaronrcox.github.io/arcgl.ts/",
     "deploy": "gh-pages -d dist"
   },
   "author": "",

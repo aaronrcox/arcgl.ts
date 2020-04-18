@@ -9,15 +9,15 @@ export class MouseInput {
     leftButtonDown: boolean = false;
 
     constructor(private canvas: HTMLCanvasElement) {
-        this.canvas.addEventListener("mousedown", this.mouseDownEventHandler);
-        this.canvas.addEventListener("mousemove", this.mouseMoveEventHandler);
-        this.canvas.addEventListener("mouseup", this.mouseUpEventHandler);
+        document.addEventListener("mousedown", this.mouseDownEventHandler);
+        document.addEventListener("mousemove", this.mouseMoveEventHandler);
+        document.addEventListener("mouseup", this.mouseUpEventHandler);
     }
 
     destroy() {
-        this.canvas.removeEventListener("mousedown", this.mouseDownEventHandler);
-        this.canvas.removeEventListener("mousemove", this.mouseMoveEventHandler);
-        this.canvas.removeEventListener("mouseup", this.mouseUpEventHandler);
+        document.removeEventListener("mousedown", this.mouseDownEventHandler);
+        document.removeEventListener("mousemove", this.mouseMoveEventHandler);
+        document.removeEventListener("mouseup", this.mouseUpEventHandler);
     }
 
     update() {

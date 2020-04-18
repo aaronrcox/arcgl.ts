@@ -42,7 +42,7 @@ export class RayCastingDemo extends App {
         // this.polygons.push( Shape.makeCircle(400, 400, 50,4));
 
         this.polygons.push( Shape.makeBox(left, top, right-left, bottom-top));
-        this.polygons.push( Shape.makeBox(0, 0,ww, wh));
+        //this.polygons.push( Shape.makeBox(0, 0,ww, wh));
 
         // this.polygons.push( Shape.makeLine(200, 100, 200, 400));
         // this.polygons.push( Shape.makeLine(500, 400, 500, 100));
@@ -70,17 +70,17 @@ export class RayCastingDemo extends App {
         // this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
         // this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
 
-        this.elapsedTime = Math.PI / 3;
-        //this.rays = this.makeRayLine(this.input.mouse.pos, new Vec2(Math.cos(this.elapsedTime), Math.sin(this.elapsedTime)), 10, 1);
+        const s = this.elapsedTime * 0.1;
+        this.rays = this.makeRayLine(this.input.mouse.pos, new Vec2(Math.cos(s), Math.sin(s)), 10, 3);
         //this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
-        this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
+        //this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
 
         this.rayHits = [];
         this.allRays = [];
 
         for(let i=0; i<this.rays.length; i++) {
             const r = this.rays[i]
-            r.castToShapes(this.polygons, 0);
+            r.castToShapes(this.polygons, 10);
             this.rayHits.push(...r.hits());
             this.allRays.push(...r.rays());
         }
@@ -94,7 +94,6 @@ export class RayCastingDemo extends App {
             this.drawShape(p);
 
         this.drawRays(this.allRays);
-        // this.drawRayHits(this.rayHits);
 
         this.renderer2d.end();
     }

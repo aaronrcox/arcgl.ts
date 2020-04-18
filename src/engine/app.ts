@@ -2,6 +2,7 @@
 import { InputManager } from './input/inputManager';
 import { Renderer2d } from './graphics/renderer2d';
 import { FrameTimer } from './utils/frameTimer';
+import { RenderTexture } from './graphics/renderTexture';
 
 export class App
 {
@@ -23,6 +24,12 @@ export class App
         });
 
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+        // create a fake render target reresenting the canvas
+        const canvasRenderTarget = new RenderTexture(this.gl);
+        canvasRenderTarget.width = this.canvas.width;
+        canvasRenderTarget.height = this.canvas.height;
+        canvasRenderTarget.enable();
 
         this.renderer2d = new Renderer2d(this.canvas, this.gl);
     }

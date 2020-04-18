@@ -5,13 +5,26 @@ import RunDemo from './demos';
 // Launch the canvas demo
 // ============================================================================
 
-const pathnames: string[] = window.location.pathname.split('/').filter(z => z !== "");
-const demoName = pathnames[0] ?? 'LightBender';
-console.log(pathnames);
+function getDemoNameFromHash() {
+    const pathnames: string[] = window.location.hash.substr(1).split('/').filter(z => z !== "");
+    const demoName = pathnames[0] ?? 'LightBender';
+    return demoName;
+}
 
-// const app = new Demo2("canvas");
-const app = RunDemo("canvas", demoName);
-app.launch();
+function runApp() {
+    const app = RunDemo("canvas", getDemoNameFromHash());
+    app.launch();
+}
+
+// listen for hach value change events
+window.addEventListener('hashchange', () => {
+    runApp();
+});
+
+window.onload = (() => {
+    runApp();
+});
+
 
 
 

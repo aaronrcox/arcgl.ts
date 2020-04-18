@@ -3,12 +3,16 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "homepage": "https://aaronrcox.github.io/arcgl.ts/",
   "scripts": {
-    "start": "parcel serve ./src/index.html"
+    "start": "parcel serve ./src/index.html",
+    "build": "parcel build ./src/index.html --public-url https://aaronrcox.github.io/arcgl.ts/",
+    "deploy": "gh-pages -d dist"
   },
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "gh-pages": "^2.2.0",
     "parcel": "^1.12.4",
     "typescript": "^3.8.3"
   }

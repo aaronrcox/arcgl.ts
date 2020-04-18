@@ -1,0 +1,79 @@
+
+import { InputManager } from './input/inputManager';
+import { Renderer2d } from './graphics/renderer2d';
+import { FrameTimer } from './utils/frameTimer';
+
+export class App
+{
+    canvas: HTMLCanvasElement;
+    input: InputManager;
+    time: FrameTimer;
+    renderer2d: Renderer2d;
+
+    gl: WebGL2RenderingContext;
+
+    constructor(htmlCanvasId: string) {
+        this.canvas = document.getElementById(htmlCanvasId) as HTMLCanvasElement;
+        this.resize();
+        this.input = new InputManager(this.canvas);
+        this.time = new FrameTimer();
+
+        this.gl = this.canvas.getContext("webgl2", {
+            antialias: true
+        });
+
+        this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+
+        this.renderer2d = new Renderer2d(this.canvas, this.gl);
+    }
+
+    destroy() {
+        this.input.destroy();
+        this.input = null;
+    }
+
+    async loadAssets() {
+        // derrived classes will implement load asset logic.
+    }
+
+    async launch() {
+        await this.loadAssets();
+        this.run();
+    }
+
+    update() {
+    }
+
+    draw() {
+        this.gl.clearColor(0.0, 0.0, 0.0, 0.0); // black
+        this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT)
+    }
+
+    run() {
+        this.time.update();
+        this.update();
+        this.draw();
+
+        this.input.keyboard.update();
+        this.input.mouse.update();
+        
+        requestAnimationFrame(() => {
+             this.run();
+        });
+    }
+
+    private resize() {
+        // Lookup the size the browser is displaying the canvas.
+        var displayWidth  = this.canvas.clientWidth;
+        var displayHeight = this.canvas.clientHeight;
+    
+        // Check if the canvas is not the same size.
+        if (this.canvas.width  !== displayWidth ||
+            this.canvas.height !== displayHeight) {
+    
+          // Make the canvas the same size
+          this.canvas.width  = displayWidth;
+          this.canvas.height = displayHeight;
+        }
+      }
+}

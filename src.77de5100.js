@@ -1336,15 +1336,15 @@ function () {
       _this.leftButtonDown = false;
     };
 
-    this.canvas.addEventListener("mousedown", this.mouseDownEventHandler);
-    this.canvas.addEventListener("mousemove", this.mouseMoveEventHandler);
-    this.canvas.addEventListener("mouseup", this.mouseUpEventHandler);
+    document.addEventListener("mousedown", this.mouseDownEventHandler);
+    document.addEventListener("mousemove", this.mouseMoveEventHandler);
+    document.addEventListener("mouseup", this.mouseUpEventHandler);
   }
 
   MouseInput.prototype.destroy = function () {
-    this.canvas.removeEventListener("mousedown", this.mouseDownEventHandler);
-    this.canvas.removeEventListener("mousemove", this.mouseMoveEventHandler);
-    this.canvas.removeEventListener("mouseup", this.mouseUpEventHandler);
+    document.removeEventListener("mousedown", this.mouseDownEventHandler);
+    document.removeEventListener("mousemove", this.mouseMoveEventHandler);
+    document.removeEventListener("mouseup", this.mouseUpEventHandler);
   };
 
   MouseInput.prototype.update = function () {
@@ -1604,6 +1604,88 @@ function () {
 }();
 
 exports.Shader = Shader;
+},{}],"engine/graphics/renderTexture.ts":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var RenderTexture =
+/** @class */
+function () {
+  function RenderTexture(gl) {
+    this.gl = gl;
+    this.width = 0;
+    this.height = 0;
+    this.handle = null;
+    this.glFrameBuffer = null;
+    this.glDepthBuffer = null;
+  }
+
+  RenderTexture.prototype.load = function (width, height) {
+    this.width = width;
+    this.height = height; // Create an opengl texture
+
+    this.handle = this.gl.createTexture();
+    this.gl.bindTexture(this.gl.TEXTURE_2D, this.handle);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.NEAREST);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.NEAREST);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.REPEAT);
+    this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.REPEAT);
+    this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.width, this.height, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, null); // create the framebuffer
+
+    this.glFrameBuffer = this.gl.createFramebuffer();
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, this.glFrameBuffer);
+    this.gl.framebufferTexture2D(this.gl.FRAMEBUFFER, this.gl.COLOR_ATTACHMENT0, this.gl.TEXTURE_2D, this.handle, 0);
+    this.gl.drawBuffers([this.gl.COLOR_ATTACHMENT0]); // checck if everything was successfull
+
+    var frameBufferStatus = this.gl.checkFramebufferStatus(this.gl.FRAMEBUFFER);
+    if (frameBufferStatus != this.gl.FRAMEBUFFER_COMPLETE) return false; // restore things back to normal
+
+    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
+    return true;
+  };
+
+  RenderTexture.prototype.destroy = function () {
+    this.gl.deleteFramebuffer(this.glFrameBuffer);
+    this.gl.deleteTexture(this.handle);
+  };
+
+  RenderTexture.prototype.enable = function () {
+    RenderTexture.enableRenderTarget(this.gl, this);
+  };
+
+  RenderTexture.prototype.disable = function () {
+    RenderTexture.disableRenderTarget(this.gl);
+  };
+
+  RenderTexture.enableRenderTarget = function (gl, target) {
+    RenderTexture.rendetTargetStack.push(target);
+    var currentRenderTarget = RenderTexture.currentRenderTarget();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, currentRenderTarget.glFrameBuffer);
+    gl.viewport(0, 0, currentRenderTarget.width, currentRenderTarget.height);
+  };
+
+  RenderTexture.disableRenderTarget = function (gl) {
+    if (RenderTexture.rendetTargetStack.length > 1) RenderTexture.rendetTargetStack.pop();
+    var currentRenderTarget = RenderTexture.currentRenderTarget();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, currentRenderTarget.glFrameBuffer);
+    gl.viewport(0, 0, currentRenderTarget.width, currentRenderTarget.height);
+  };
+
+  RenderTexture.currentRenderTarget = function () {
+    var _a;
+
+    return (_a = RenderTexture.rendetTargetStack[RenderTexture.rendetTargetStack.length - 1]) !== null && _a !== void 0 ? _a : null;
+  };
+
+  RenderTexture.rendetTargetStack = [];
+  return RenderTexture;
+}();
+
+exports.RenderTexture = RenderTexture;
 },{}],"engine/graphics/renderer2d.ts":[function(require,module,exports) {
 "use strict";
 
@@ -1660,6 +1742,8 @@ var texture_1 = require("./texture");
 var shader_1 = require("./shader");
 
 var mat3_1 = require("../math/mat3");
+
+var renderTexture_1 = require("./renderTexture");
 
 var RenderMode;
 
@@ -1916,9 +2000,7 @@ function () {
 
     this.blankTexture = new texture_1.Texture2D(this.gl);
     this.blankTexture.load("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=");
-    this.saveState(true); // setup 2d projection matrix
-
-    this.projection = math_1.Mat4.orthographicProjection(0, this.canvas.width, this.canvas.height, 0, 0, 100); // load shader
+    this.saveState(true); // load shader
 
     this.shader = new Renderer2DSpriteShader(this.gl); // setup sprite graphics buffers
 
@@ -1934,6 +2016,9 @@ function () {
     this.processingRender = true;
     this.spriteBuffer.clear();
     this.currentTextureId = 0;
+    var renderTarget = renderTexture_1.RenderTexture.currentRenderTarget(); // setup 2d projection matrix
+
+    if (renderTarget == null) this.projection = math_1.Mat4.orthographicProjection(0, this.canvas.width, this.canvas.height, 0, 0, 100);else this.projection = math_1.Mat4.orthographicProjection(0, renderTarget.width, renderTarget.height, 0, 0, 100);
     this.gl.enable(this.gl.BLEND);
     this.gl.blendFunc(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA);
     this.gl.blendFuncSeparate(this.gl.SRC_ALPHA, this.gl.ONE_MINUS_SRC_ALPHA, this.gl.ONE, this.gl.ONE);
@@ -2091,6 +2176,27 @@ function () {
     }
   };
 
+  Renderer2d.prototype.clear = function (r, b, g, a) {
+    if (r === void 0) {
+      r = 1;
+    }
+
+    if (b === void 0) {
+      b = 1;
+    }
+
+    if (g === void 0) {
+      g = 1;
+    }
+
+    if (a === void 0) {
+      a = 1;
+    }
+
+    this.gl.clearColor(r, g, b, a);
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+  };
+
   Renderer2d.prototype.setTexture = function (texture) {
     var state = this.renderState[this.renderState.length - 1];
     state.texture = texture;
@@ -2206,7 +2312,7 @@ function () {
 }();
 
 exports.Renderer2d = Renderer2d;
-},{"../math":"engine/math/index.ts","./texture":"engine/graphics/texture.ts","./shader":"engine/graphics/shader.ts","../math/mat3":"engine/math/mat3.ts"}],"engine/utils/timer.ts":[function(require,module,exports) {
+},{"../math":"engine/math/index.ts","./texture":"engine/graphics/texture.ts","./shader":"engine/graphics/shader.ts","../math/mat3":"engine/math/mat3.ts","./renderTexture":"engine/graphics/renderTexture.ts"}],"engine/utils/timer.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -2459,6 +2565,8 @@ var renderer2d_1 = require("./graphics/renderer2d");
 
 var frameTimer_1 = require("./utils/frameTimer");
 
+var renderTexture_1 = require("./graphics/renderTexture");
+
 var App =
 /** @class */
 function () {
@@ -2470,7 +2578,12 @@ function () {
     this.gl = this.canvas.getContext("webgl2", {
       antialias: true
     });
-    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+    this.gl.viewport(0, 0, this.canvas.width, this.canvas.height); // create a fake render target reresenting the canvas
+
+    var canvasRenderTarget = new renderTexture_1.RenderTexture(this.gl);
+    canvasRenderTarget.width = this.canvas.width;
+    canvasRenderTarget.height = this.canvas.height;
+    canvasRenderTarget.enable();
     this.renderer2d = new renderer2d_1.Renderer2d(this.canvas, this.gl);
   }
 
@@ -2547,7 +2660,7 @@ function () {
 }();
 
 exports.App = App;
-},{"./input/inputManager":"engine/input/inputManager.ts","./graphics/renderer2d":"engine/graphics/renderer2d.ts","./utils/frameTimer":"engine/utils/frameTimer.ts"}],"demos/lightBender/levels.ts":[function(require,module,exports) {
+},{"./input/inputManager":"engine/input/inputManager.ts","./graphics/renderer2d":"engine/graphics/renderer2d.ts","./utils/frameTimer":"engine/utils/frameTimer.ts","./graphics/renderTexture":"engine/graphics/renderTexture.ts"}],"demos/lightBender/levels.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -2951,7 +3064,7 @@ function () {
 
   Tile.prototype.moveToTargetPos = function (dt) {
     if (this.isMovingToTarget === false) return;
-    var speed = 8;
+    var speed = 6;
     var moveDir = math_1.Vec2.sub(this.targetPos, this.pos).normalise();
     this.pos.add({
       x: moveDir.x * dt * this.size.x * speed,
@@ -3791,8 +3904,8 @@ function (_super) {
             // this.polygons.push( Shape.makeCircle(300, 500, 50,4));
             // this.polygons.push( Shape.makeCircle(400, 400, 50,4));
 
-            this.polygons.push(math_1.Shape.makeBox(left, top, right - left, bottom - top));
-            this.polygons.push(math_1.Shape.makeBox(0, 0, ww, wh)); // this.polygons.push( Shape.makeLine(200, 100, 200, 400));
+            this.polygons.push(math_1.Shape.makeBox(left, top, right - left, bottom - top)); //this.polygons.push( Shape.makeBox(0, 0,ww, wh));
+            // this.polygons.push( Shape.makeLine(200, 100, 200, 400));
             // this.polygons.push( Shape.makeLine(500, 400, 500, 100));
             //this.polygons.push( Shape.makeLine(100, 300, 400, 300));
             //this.polygons.push( Shape.makeLine(400, 300, 100, 300));
@@ -3816,16 +3929,16 @@ function (_super) {
     // this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
     // this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
 
-    this.elapsedTime = Math.PI / 3; //this.rays = this.makeRayLine(this.input.mouse.pos, new Vec2(Math.cos(this.elapsedTime), Math.sin(this.elapsedTime)), 10, 1);
-    //this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
+    var s = this.elapsedTime * 0.1;
+    this.rays = this.makeRayLine(this.input.mouse.pos, new math_1.Vec2(Math.cos(s), Math.sin(s)), 10, 3); //this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
+    //this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
 
-    this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
     this.rayHits = [];
     this.allRays = [];
 
     for (var i = 0; i < this.rays.length; i++) {
       var r = this.rays[i];
-      r.castToShapes(this.polygons, 0);
+      r.castToShapes(this.polygons, 10);
 
       (_a = this.rayHits).push.apply(_a, __spread(r.hits()));
 
@@ -3857,8 +3970,7 @@ function (_super) {
       }
     }
 
-    this.drawRays(this.allRays); // this.drawRayHits(this.rayHits);
-
+    this.drawRays(this.allRays);
     this.renderer2d.end();
   };
 
@@ -4222,7 +4334,282 @@ function (_super) {
 }(app_1.App);
 
 exports.LineRenderingDemo = LineRenderingDemo;
-},{"../../engine/app":"engine/app.ts","../../engine/math":"engine/math/index.ts"}],"demos/index.ts":[function(require,module,exports) {
+},{"../../engine/app":"engine/app.ts","../../engine/math":"engine/math/index.ts"}],"assets/prop-crate-plain.png":[function(require,module,exports) {
+module.exports = "/prop-crate-plain.a7165fa2.png";
+},{}],"demos/renderTextureDemo/index.ts":[function(require,module,exports) {
+"use strict";
+
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (b.hasOwnProperty(p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+var __awaiter = this && this.__awaiter || function (thisArg, _arguments, P, generator) {
+  function adopt(value) {
+    return value instanceof P ? value : new P(function (resolve) {
+      resolve(value);
+    });
+  }
+
+  return new (P || (P = Promise))(function (resolve, reject) {
+    function fulfilled(value) {
+      try {
+        step(generator.next(value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+
+    function rejected(value) {
+      try {
+        step(generator["throw"](value));
+      } catch (e) {
+        reject(e);
+      }
+    }
+
+    function step(result) {
+      result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected);
+    }
+
+    step((generator = generator.apply(thisArg, _arguments || [])).next());
+  });
+};
+
+var __generator = this && this.__generator || function (thisArg, body) {
+  var _ = {
+    label: 0,
+    sent: function sent() {
+      if (t[0] & 1) throw t[1];
+      return t[1];
+    },
+    trys: [],
+    ops: []
+  },
+      f,
+      y,
+      t,
+      g;
+  return g = {
+    next: verb(0),
+    "throw": verb(1),
+    "return": verb(2)
+  }, typeof Symbol === "function" && (g[Symbol.iterator] = function () {
+    return this;
+  }), g;
+
+  function verb(n) {
+    return function (v) {
+      return step([n, v]);
+    };
+  }
+
+  function step(op) {
+    if (f) throw new TypeError("Generator is already executing.");
+
+    while (_) {
+      try {
+        if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+        if (y = 0, t) op = [op[0] & 2, t.value];
+
+        switch (op[0]) {
+          case 0:
+          case 1:
+            t = op;
+            break;
+
+          case 4:
+            _.label++;
+            return {
+              value: op[1],
+              done: false
+            };
+
+          case 5:
+            _.label++;
+            y = op[1];
+            op = [0];
+            continue;
+
+          case 7:
+            op = _.ops.pop();
+
+            _.trys.pop();
+
+            continue;
+
+          default:
+            if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+              _ = 0;
+              continue;
+            }
+
+            if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
+              _.label = op[1];
+              break;
+            }
+
+            if (op[0] === 6 && _.label < t[1]) {
+              _.label = t[1];
+              t = op;
+              break;
+            }
+
+            if (t && _.label < t[2]) {
+              _.label = t[2];
+
+              _.ops.push(op);
+
+              break;
+            }
+
+            if (t[2]) _.ops.pop();
+
+            _.trys.pop();
+
+            continue;
+        }
+
+        op = body.call(thisArg, _);
+      } catch (e) {
+        op = [6, e];
+        y = 0;
+      } finally {
+        f = t = 0;
+      }
+    }
+
+    if (op[0] & 5) throw op[1];
+    return {
+      value: op[0] ? op[1] : void 0,
+      done: true
+    };
+  }
+};
+
+var __importDefault = this && this.__importDefault || function (mod) {
+  return mod && mod.__esModule ? mod : {
+    "default": mod
+  };
+};
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+
+var prop_crate_plain_png_1 = __importDefault(require("../../assets/prop-crate-plain.png"));
+
+var texture_1 = require("../../engine/graphics/texture");
+
+var app_1 = require("../../engine/app");
+
+var math_1 = require("../../engine/math");
+
+var renderTexture_1 = require("../../engine/graphics/renderTexture");
+
+var RenderTextureDemo =
+/** @class */
+function (_super) {
+  __extends(RenderTextureDemo, _super);
+
+  function RenderTextureDemo(htmlCanvasId) {
+    var _this = _super.call(this, htmlCanvasId) || this;
+
+    _this.rot = 0;
+    return _this;
+  }
+
+  RenderTextureDemo.prototype.loadAssets = function () {
+    return __awaiter(this, void 0, Promise, function () {
+      var renderTextureSize;
+      return __generator(this, function (_a) {
+        switch (_a.label) {
+          case 0:
+            return [4
+            /*yield*/
+            , _super.prototype.loadAssets.call(this)];
+
+          case 1:
+            _a.sent();
+
+            this.image = new texture_1.Texture2D(this.gl);
+            this.image.load(prop_crate_plain_png_1.default);
+            this.renderTexture = new renderTexture_1.RenderTexture(this.gl);
+            renderTextureSize = Math.min(this.canvas.width / 4, 256);
+            this.renderTexture.load(renderTextureSize, renderTextureSize);
+            return [2
+            /*return*/
+            ];
+        }
+      });
+    });
+  };
+
+  RenderTextureDemo.prototype.update = function () {
+    _super.prototype.update.call(this);
+
+    this.rot += this.time.deltaTime;
+  };
+
+  RenderTextureDemo.prototype.draw = function () {
+    _super.prototype.draw.call(this);
+
+    var size = this.renderTexture.width; // Draw an image onto the render target
+    // ================================================
+
+    this.renderTexture.enable();
+    this.gl.clear(this.gl.COLOR_BUFFER_BIT);
+    this.renderer2d.begin();
+    this.renderer2d.saveState(true);
+    this.renderer2d.setTexture(this.image);
+    this.renderer2d.setColor(new math_1.Vec4(1, 1, 1, 1));
+    this.renderer2d.darwRect(size / 2, size / 2, size * 0.75, size * 0.75, this.rot, 0.5, 0.5);
+    this.renderer2d.drawLines(math_1.Shape.makeBox(1, 1, size - 2, size - 2).points, 2);
+    this.renderer2d.popState();
+    this.renderer2d.end();
+    this.renderTexture.disable(); // ================================================
+    // draw the render target image back to the canvas
+    //================================================
+
+    this.renderer2d.begin();
+    this.renderer2d.saveState(true);
+    this.renderer2d.setTexture(this.renderTexture);
+    this.renderer2d.setColor(new math_1.Vec4(1, 1, 1, 1));
+    this.renderer2d.darwRect(this.canvas.width / 2 - size - 10, this.canvas.height / 2, size, size, 0, 0.5, 0.5);
+    this.renderer2d.setColor(new math_1.Vec4(0, 0, 0, 1));
+    this.renderer2d.darwRect(this.canvas.width / 2, this.canvas.height / 2, size, size, 0, 0.5, 0.5);
+    this.renderer2d.setColor(new math_1.Vec4(1, 0, 0, 1));
+    this.renderer2d.darwRect(this.canvas.width / 2 + size + 10, this.canvas.height / 2, size, size, 0, 0.5, 0.5);
+    this.renderer2d.popState();
+    this.renderer2d.end();
+  };
+
+  return RenderTextureDemo;
+}(app_1.App);
+
+exports.RenderTextureDemo = RenderTextureDemo;
+},{"../../assets/prop-crate-plain.png":"assets/prop-crate-plain.png","../../engine/graphics/texture":"engine/graphics/texture.ts","../../engine/app":"engine/app.ts","../../engine/math":"engine/math/index.ts","../../engine/graphics/renderTexture":"engine/graphics/renderTexture.ts"}],"demos/index.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -4234,6 +4621,8 @@ var lightBender_1 = require("./lightBender");
 var rayCasting_1 = require("./rayCasting");
 
 var lineRendering_1 = require("./lineRendering");
+
+var renderTextureDemo_1 = require("./renderTextureDemo");
 
 var app_1 = require("../engine/app");
 
@@ -4248,13 +4637,16 @@ function RunDemo(canvasId, name) {
     case 'LineRenderingDemo':
       return new lineRendering_1.LineRenderingDemo(canvasId);
 
+    case 'RenderTextureDemo':
+      return new renderTextureDemo_1.RenderTextureDemo(canvasId);
+
     default:
       return new app_1.App(canvasId);
   }
 }
 
 exports.default = RunDemo;
-},{"./lightBender":"demos/lightBender/index.ts","./rayCasting":"demos/rayCasting/index.ts","./lineRendering":"demos/lineRendering/index.ts","../engine/app":"engine/app.ts"}],"index.ts":[function(require,module,exports) {
+},{"./lightBender":"demos/lightBender/index.ts","./rayCasting":"demos/rayCasting/index.ts","./lineRendering":"demos/lineRendering/index.ts","./renderTextureDemo":"demos/renderTextureDemo/index.ts","../engine/app":"engine/app.ts"}],"index.ts":[function(require,module,exports) {
 "use strict";
 
 var __importDefault = this && this.__importDefault || function (mod) {
@@ -4345,7 +4737,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56437" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "63262" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

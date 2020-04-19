@@ -271,7 +271,8 @@ function () {
 
   Vec2.prototype.scale = function (rhs) {
     this.x *= rhs;
-    this.y * -rhs;
+    this.y *= rhs;
+    return this;
   };
 
   Vec2.prototype.negate = function () {
@@ -327,6 +328,8 @@ exports.Vec2 = Vec2;
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
+
+var vec2_1 = require("./vec2");
 
 var Vec3 =
 /** @class */
@@ -393,10 +396,14 @@ function () {
     enumerable: true,
     configurable: true
   });
-  Object.defineProperty(Vec3.prototype, "xyz", {
+  Object.defineProperty(Vec3.prototype, "xy", {
     get: function get() {
-      return [this.x, this.y, this.z];
+      return new vec2_1.Vec2(this[0], this[1]);
     },
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(Vec3.prototype, "xyz", {
     set: function set(value) {
       this.x = value[0];
       this.y = value[1];
@@ -483,7 +490,7 @@ function () {
 }();
 
 exports.Vec3 = Vec3;
-},{}],"engine/math/vec4.ts":[function(require,module,exports) {
+},{"./vec2":"engine/math/vec2.ts"}],"engine/math/vec4.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
@@ -685,8 +692,6 @@ function () {
     for (var i = 0; i < 9; i++) {
       this[i] = mat3[i];
     }
-
-    this.mul = this.mul.bind(this);
   }
 
   Mat3.prototype[Symbol.iterator] = function () {
@@ -724,6 +729,13 @@ function () {
     enumerable: true,
     configurable: true
   });
+  Object.defineProperty(Mat3.prototype, "scale", {
+    get: function get() {
+      return new vec2_1.Vec2(this.right.length(), this.up.length());
+    },
+    enumerable: true,
+    configurable: true
+  });
 
   Mat3.row = function (mat, i) {
     var ri = i * 3;
@@ -732,6 +744,10 @@ function () {
 
   Mat3.col = function (mat, i) {
     return new vec3_1.Vec3(mat[i + 0], mat[i + 3], mat[i + 6]);
+  };
+
+  Mat3.identity = function () {
+    return new Mat3([1, 0, 0, 0, 1, 0, 0, 0, 1]);
   };
 
   Mat3.translation = function (x, y) {
@@ -777,11 +793,44 @@ function () {
     //     y: Vec3.dot(point, c2 ),
     //     z: Vec3.dot(point, c3 )
     // }
+  }; // mul(rhs: Mat3): Mat3 {
+  //     const result = Mat3.mul(this, rhs);
+  //     return result;
+  // }
+
+
+  Mat3.prototype.copy = function () {
+    return new Mat3([this[0], this[1], this[2], this[3], this[4], this[5], this[6], this[7], this[8]]);
   };
 
-  Mat3.prototype.mul = function (rhs) {
-    var result = Mat3.mul(this, rhs);
-    return result;
+  Mat3.prototype.equal = function (rhs) {
+    var e = Number.EPSILON;
+
+    for (var i = 0; i < 9; i++) {
+      if (Math.abs(this[i] - rhs[i]) > e) {
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  Mat3.prototype.move = function (tx, ty) {
+    this[6] += tx;
+    this[7] += ty;
+  };
+
+  Mat3.prototype.setPos = function (tx, ty) {
+    this[6] = tx;
+    this[7] = ty;
+  };
+
+  Mat3.prototype.setPosX = function (tx) {
+    this[6] = tx;
+  };
+
+  Mat3.prototype.setPosY = function (ty) {
+    this[7] = ty;
   };
 
   return Mat3;
@@ -1129,11 +1178,15 @@ function () {
     return true;
   };
 
-  Ray.prototype.castToShapes = function (shapes, numReflections) {
+  Ray.prototype.castToShapes = function (shapes, numReflections, shouldRefletCallback) {
     var e_1, _a;
 
     if (numReflections === void 0) {
       numReflections = 0;
+    }
+
+    if (shouldRefletCallback === void 0) {
+      shouldRefletCallback = null;
     }
 
     var bestHit = null;
@@ -1168,7 +1221,13 @@ function () {
     }
 
     this.hit = bestHit;
-    if (numReflections > 0 && this.hit) this.hit.reflectedRay.castToShapes(shapes, numReflections - 1);
+
+    if (numReflections > 0 && this.hit) {
+      var shouldReflect = bestHit == null || shouldRefletCallback === null || shouldRefletCallback(bestHit);
+      if (shouldReflect) this.hit.reflectedRay.castToShapes(shapes, numReflections - 1); // else
+      //     this.hit.reflectedRay = null;
+    }
+
     return this.hit !== null;
   };
 
@@ -1210,6 +1269,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var mat3_1 = require("./mat3");
+
 var Shape =
 /** @class */
 function () {
@@ -1248,23 +1309,66 @@ function () {
     return new Shape(points);
   };
 
-  Shape.makeBox = function (x, y, width, height) {
+  Shape.makeBox = function (x, y, width, height, rot, open) {
+    if (open === void 0) {
+      open = false;
+    }
+
     var points = [{
-      x: x,
-      y: y
+      x: width / 2,
+      y: height / 2,
+      z: 1
     }, {
-      x: x + width,
-      y: y
+      x: -width / 2,
+      y: height / 2,
+      z: 1
     }, {
-      x: x + width,
-      y: y + height
+      x: -width / 2,
+      y: -height / 2,
+      z: 1
     }, {
-      x: x,
-      y: y + height
-    }, {
-      x: x,
-      y: y
+      x: width / 2,
+      y: -height / 2,
+      z: 1
     }];
+
+    if (!open) {
+      points.push({
+        x: width / 2,
+        y: height / 2,
+        z: 1
+      });
+    }
+
+    points = points.map(function (p) {
+      return mat3_1.Mat3.transformPoint(mat3_1.Mat3.mul(mat3_1.Mat3.rotation(rot), mat3_1.Mat3.translation(x, y)), p);
+    });
+    return new Shape(points);
+  };
+
+  Shape.makeAngleTriangle = function (x, y, width, height, rot) {
+    var hw = Math.ceil(width * 0.5);
+    var hh = Math.ceil(height * 0.5);
+    var points = [{
+      x: 0 - hw,
+      y: 0 - hh,
+      z: 1
+    }, {
+      x: 0 + hw,
+      y: 0 - hh,
+      z: 1
+    }, {
+      x: 0 - hw,
+      y: 0 + hh,
+      z: 1
+    }, {
+      x: 0 - hw,
+      y: 0 - hh,
+      z: 1
+    }];
+    points = points.map(function (p) {
+      return mat3_1.Mat3.transformPoint(mat3_1.Mat3.mul(mat3_1.Mat3.rotation(rot), mat3_1.Mat3.translation(x, y)), p);
+    });
     return new Shape(points);
   };
 
@@ -1272,7 +1376,7 @@ function () {
 }();
 
 exports.Shape = Shape;
-},{}],"engine/math/index.ts":[function(require,module,exports) {
+},{"./mat3":"engine/math/mat3.ts"}],"engine/math/index.ts":[function(require,module,exports) {
 "use strict";
 
 function __export(m) {
@@ -1389,7 +1493,6 @@ function () {
     this.keyState = {};
 
     this.keyDownEventHandler = function (e) {
-      console.log(e.key + ' : ' + e.keyCode);
       _this.keyState[e.keyCode] = true;
     };
 
@@ -1399,10 +1502,7 @@ function () {
 
     console.log('creating keyboard input');
     document.addEventListener("keydown", this.keyDownEventHandler);
-    document.addEventListener("keyup", this.keyUpEventHandler); // this.canvas.onkeydown = this.keyDownEventHandler;
-    // this.canvas.onkeydown = this.keyUpEventHandler;
-    //this.canvas.addEventListener("keydown", this.keyDownEventHandler);
-    //this.canvas.addEventListener("keyup", this.keyUpEventHandler);
+    document.addEventListener("keyup", this.keyUpEventHandler);
   }
 
   KeyboardInput.prototype.destroy = function () {
@@ -2031,8 +2131,8 @@ function () {
     this.processingRender = false; // reset the renderstate so its fresh
 
     this.renderState = [];
-    this.saveState(true);
-    console.log("Flushes: " + this.numFlushes);
+    this.saveState(true); //console.log(`Flushes: ${this.numFlushes}`);
+
     this.numFlushes = 0;
   };
 
@@ -2044,7 +2144,7 @@ function () {
     var textureId = this.useTexture((_a = state.texture) !== null && _a !== void 0 ? _a : this.blankTexture);
     var color = (_b = state.color) !== null && _b !== void 0 ? _b : [math_1.Vec4.ONE, math_1.Vec4.ONE, math_1.Vec4.ONE, math_1.Vec4.ONE];
     var uvRect = (_c = state.uvRect) !== null && _c !== void 0 ? _c : new math_1.Rect(0, 0, 1, 1);
-    var transform = mat3_1.Mat3.scale(width, height).mul(mat3_1.Mat3.rotation(rot)).mul(mat3_1.Mat3.translation(xPos, yPos)); // calculate the position for each of the quads
+    var transform = mat3_1.Mat3.mul(mat3_1.Mat3.mul(mat3_1.Mat3.scale(width, height), mat3_1.Mat3.rotation(rot)), mat3_1.Mat3.translation(xPos, yPos)); // calculate the position for each of the quads
 
     var tl = mat3_1.Mat3.transformPoint(transform, {
       x: 0 - xOrigin,
@@ -2673,24 +2773,12 @@ exports.levels = [{
   tileSize: 55,
   rows: 8,
   cols: 8,
-  startTile: [4, 1],
-  layout: [[0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 1, 1, 1, 1, 0, 0], [0, 0, 1, 1, 2, 4, 0, 0], [0, 0, 1, 1, 1, 1, 0, 0], [0, 0, 1, 1, 1, 1, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]],
-  lights: [[0, 0, 0, 0, 0, 41, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 1, 0, 0, 0, 0]],
-  fixed: [[0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0, 0]],
+  startTile: [6, 4],
+  map: [["0000", "0000", "0000", "1424", "0000", "0000", "0000", "0000"], ["0000", "0000", "0000", "0000", "0000", "0000", "0000", "0000"], ["0000", "0000", "0001", "0001", "0001", "0001", "0000", "0000"], ["1325", "0000", "0001", "0001", "0001", "0001", "0000", "0000"], ["0000", "0000", "0001", "0001", "0001", "0001", "0001", "0000"], ["0000", "0000", "0001", "0001", "0001", "0103", "0000", "0000"], ["0000", "0000", "0000", "0000", "0000", "0000", "0000", "0000"], ["0000", "0000", "0000", "0000", "0000", "0000", "0000", "0000"]],
   zones: [new math_1.Rect(2, 2, 4, 4)]
 }];
-},{"../../engine/math":"engine/math/index.ts"}],"demos/lightBender/assets/tile-type-solid.png":[function(require,module,exports) {
-module.exports = "/tile-type-solid.d14769bd.png";
-},{}],"demos/lightBender/assets/tile-type-1.png":[function(require,module,exports) {
-module.exports = "/tile-type-1.fd042495.png";
-},{}],"demos/lightBender/assets/tile-type-2.png":[function(require,module,exports) {
-module.exports = "/tile-type-2.0321ce29.png";
-},{}],"demos/lightBender/assets/tile-type-3.png":[function(require,module,exports) {
-module.exports = "/tile-type-3.880dcbe2.png";
-},{}],"demos/lightBender/assets/tile-type-4.png":[function(require,module,exports) {
-module.exports = "/tile-type-4.65fd9987.png";
-},{}],"demos/lightBender/assets/tile-type-5.png":[function(require,module,exports) {
-module.exports = "/tile-type-5.bf073976.png";
+},{"../../engine/math":"engine/math/index.ts"}],"demos/lightBender/assets/tile-base.png":[function(require,module,exports) {
+module.exports = "/tile-base.ebd03cfc.png";
 },{}],"demos/lightBender/index.ts":[function(require,module,exports) {
 "use strict";
 
@@ -2880,6 +2968,41 @@ var __values = this && this.__values || function (o) {
   throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
 };
 
+var __read = this && this.__read || function (o, n) {
+  var m = typeof Symbol === "function" && o[Symbol.iterator];
+  if (!m) return o;
+  var i = m.call(o),
+      r,
+      ar = [],
+      e;
+
+  try {
+    while ((n === void 0 || n-- > 0) && !(r = i.next()).done) {
+      ar.push(r.value);
+    }
+  } catch (error) {
+    e = {
+      error: error
+    };
+  } finally {
+    try {
+      if (r && !r.done && (m = i["return"])) m.call(i);
+    } finally {
+      if (e) throw e.error;
+    }
+  }
+
+  return ar;
+};
+
+var __spread = this && this.__spread || function () {
+  for (var ar = [], i = 0; i < arguments.length; i++) {
+    ar = ar.concat(__read(arguments[i]));
+  }
+
+  return ar;
+};
+
 var __importDefault = this && this.__importDefault || function (mod) {
   return mod && mod.__esModule ? mod : {
     "default": mod
@@ -2897,71 +3020,134 @@ var math_1 = require("../../engine/math");
 var levels_1 = require("./levels"); // import assets
 
 
-var tile_type_solid_png_1 = __importDefault(require("./assets/tile-type-solid.png"));
-
-var tile_type_1_png_1 = __importDefault(require("./assets/tile-type-1.png"));
-
-var tile_type_2_png_1 = __importDefault(require("./assets/tile-type-2.png"));
-
-var tile_type_3_png_1 = __importDefault(require("./assets/tile-type-3.png"));
-
-var tile_type_4_png_1 = __importDefault(require("./assets/tile-type-4.png"));
-
-var tile_type_5_png_1 = __importDefault(require("./assets/tile-type-5.png"));
+var tile_base_png_1 = __importDefault(require("./assets/tile-base.png"));
 
 var texture_1 = require("../../engine/graphics/texture");
 
-var backgroundColor = new math_1.Vec4(236 / 255, 239 / 255, 241 / 255, 1.0);
-var backgroundLineColor = new math_1.Vec4(1, 1, 1, 1);
 var lightColors = {
-  1: new math_1.Vec4(255 / 255, 138 / 255, 128 / 255, 1),
-  2: new math_1.Vec4(43 / 255, 187 / 255, 173 / 255, 1),
-  3: new math_1.Vec4(179 / 255, 136 / 255, 255 / 255, 1),
-  4: new math_1.Vec4(149 / 255, 158 / 255, 255 / 255, 1),
-  5: new math_1.Vec4(63 / 255, 114 / 255, 155 / 255, 1)
+  1: new math_1.Vec4(255 / 255, 255 / 255, 255 / 255, 1),
+  2: new math_1.Vec4(255 / 255, 138 / 255, 128 / 255, 1),
+  3: new math_1.Vec4(43 / 255, 187 / 255, 173 / 255, 1),
+  4: new math_1.Vec4(179 / 255, 136 / 255, 255 / 255, 1),
+  5: new math_1.Vec4(149 / 255, 158 / 255, 255 / 255, 1),
+  6: new math_1.Vec4(63 / 255, 114 / 255, 155 / 255, 1)
 };
-var LightDir;
+var TILE_DIR;
 
-(function (LightDir) {
-  LightDir[LightDir["NONE"] = 0] = "NONE";
-  LightDir[LightDir["LEFT"] = 1] = "LEFT";
-  LightDir[LightDir["UP"] = 2] = "UP";
-  LightDir[LightDir["RIGHT"] = 3] = "RIGHT";
-  LightDir[LightDir["DOWN"] = 4] = "DOWN";
-})(LightDir || (LightDir = {}));
+(function (TILE_DIR) {
+  TILE_DIR[TILE_DIR["NONE"] = 0] = "NONE";
+  TILE_DIR[TILE_DIR["LEFT"] = 1] = "LEFT";
+  TILE_DIR[TILE_DIR["UP"] = 2] = "UP";
+  TILE_DIR[TILE_DIR["RIGHT"] = 3] = "RIGHT";
+  TILE_DIR[TILE_DIR["DOWN"] = 4] = "DOWN";
+})(TILE_DIR || (TILE_DIR = {}));
 
 var TILE_SHAPE;
 
 (function (TILE_SHAPE) {
   TILE_SHAPE[TILE_SHAPE["NONE"] = 0] = "NONE";
   TILE_SHAPE[TILE_SHAPE["EMPTY"] = 1] = "EMPTY";
-  TILE_SHAPE[TILE_SHAPE["CORNER_TL"] = 2] = "CORNER_TL";
-  TILE_SHAPE[TILE_SHAPE["CORNER_TR"] = 3] = "CORNER_TR";
-  TILE_SHAPE[TILE_SHAPE["CORNER_BR"] = 4] = "CORNER_BR";
-  TILE_SHAPE[TILE_SHAPE["CORNER_BL"] = 5] = "CORNER_BL";
-  TILE_SHAPE[TILE_SHAPE["SOLID"] = 6] = "SOLID";
+  TILE_SHAPE[TILE_SHAPE["SOLID"] = 2] = "SOLID";
+  TILE_SHAPE[TILE_SHAPE["CORNER"] = 3] = "CORNER";
+  TILE_SHAPE[TILE_SHAPE["EMITTER"] = 4] = "EMITTER";
+  TILE_SHAPE[TILE_SHAPE["RECEIVER"] = 5] = "RECEIVER";
 })(TILE_SHAPE || (TILE_SHAPE = {}));
+
+var GameObject =
+/** @class */
+function () {
+  function GameObject(parent) {
+    if (parent === void 0) {
+      parent = null;
+    }
+
+    this.parent = null;
+    this.children = [];
+    this.transform = math_1.Mat3.identity();
+    this.lastTrasform = null;
+    this._isDirty = false;
+    this._dirtyCheck = false;
+    this.setParent(parent);
+  }
+
+  Object.defineProperty(GameObject.prototype, "globalTransform", {
+    get: function get() {
+      var transform = this.parent ? math_1.Mat3.mul(this.transform, this.parent.globalTransform) : this.transform;
+      return transform;
+    },
+    enumerable: true,
+    configurable: true
+  });
+  Object.defineProperty(GameObject.prototype, "isDirty", {
+    get: function get() {
+      return this._isDirty;
+    },
+    enumerable: true,
+    configurable: true
+  });
+
+  GameObject.prototype.update = function (dt) {
+    var _a;
+
+    if (this._dirtyCheck) {
+      this._isDirty = ((_a = this.lastTrasform) === null || _a === void 0 ? void 0 : _a.equal(this.transform)) == false;
+      this.lastTrasform = this.transform.copy();
+    }
+  };
+
+  GameObject.prototype.draw = function (renderer2d) {};
+
+  GameObject.prototype.setParent = function (newParent) {
+    var _a, _b;
+
+    (_a = this.parent) === null || _a === void 0 ? void 0 : _a.removeChild(this);
+    this.parent = newParent;
+    (_b = this.parent) === null || _b === void 0 ? void 0 : _b.addChild(this);
+  };
+
+  GameObject.prototype.checkForChangesPerFrame = function (doCheck) {
+    this._dirtyCheck = doCheck;
+    this._isDirty = true;
+  };
+
+  GameObject.prototype.removeChild = function (child) {
+    var index = this.children.indexOf(child);
+    if (index >= 0) this.children.splice(index, 1);
+  };
+
+  GameObject.prototype.addChild = function (child) {
+    var index = this.children.indexOf(child);
+    if (index < 0) this.children.push(child);
+  };
+
+  return GameObject;
+}();
 
 var Level =
 /** @class */
-function () {
+function (_super) {
+  __extends(Level, _super);
+
   function Level(data) {
-    this.tileTextures = {};
-    this.tiles = [];
-    this.movingTiles = new Set();
-    this.data = data;
+    var _this = _super.call(this) || this;
+
+    _this.tileTextures = {};
+    _this.tiles = [];
+    _this.movingTiles = new Set();
+    _this.data = data;
+    return _this;
   }
 
   Level.prototype.posToIndex = function (pos) {
-    var x = Math.floor((pos.x - this.pos.x) / this.data.tileSize);
-    var y = Math.floor((pos.y - this.pos.y) / this.data.tileSize);
+    var x = Math.floor(pos.x / this.data.tileSize);
+    var y = Math.floor(pos.y / this.data.tileSize);
     return new math_1.Vec2(x, y);
   };
 
   Level.prototype.indexToPos = function (index) {
     var hs = this.data.tileSize * 0.5;
-    var x = Math.floor(index.x * this.data.tileSize + this.pos.x + hs);
-    var y = Math.floor(index.y * this.data.tileSize + this.pos.y + hs);
+    var x = Math.floor(index.x * this.data.tileSize + hs);
+    var y = Math.floor(index.y * this.data.tileSize + hs);
     return new math_1.Vec2(x, y);
   };
 
@@ -2988,14 +3174,14 @@ function () {
     return null;
   };
 
-  Level.prototype.calculateLightPoints = function () {
+  Level.prototype.findTileAtIndex = function (index) {
     var e_2, _a;
 
     try {
       for (var _b = __values(this.tiles), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var light = _c.value;
-        if (!(light instanceof LightTile)) continue;
-        light.calculateLightPoints();
+        var t = _c.value;
+        var ti = this.posToIndex(t.transform.pos);
+        if (ti.x === index.x && ti.y == index.y) return t;
       }
     } catch (e_2_1) {
       e_2 = {
@@ -3010,84 +3196,81 @@ function () {
     }
   };
 
-  Level.prototype.findTileAtIndex = function (index) {
-    var e_3, _a;
-
-    try {
-      for (var _b = __values(this.tiles), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var t = _c.value;
-        var ti = this.posToIndex(t.pos);
-        if (ti.x === index.x && ti.y == index.y) return t;
-      }
-    } catch (e_3_1) {
-      e_3 = {
-        error: e_3_1
-      };
-    } finally {
-      try {
-        if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
-      } finally {
-        if (e_3) throw e_3.error;
-      }
-    }
+  Level.prototype.update = function (dt) {
+    _super.prototype.update.call(this, dt);
   };
 
+  Level.prototype.draw = function () {};
+
   return Level;
-}();
+}(GameObject);
 
 var Tile =
 /** @class */
-function () {
-  function Tile(level, pos, size, type) {
-    this.isMovingToTarget = false;
-    this.level = level;
-    this.pos = pos;
-    this.size = size;
-    this.targetPos = new math_1.Vec2(pos.x, pos.y);
-    this.type = type;
+function (_super) {
+  __extends(Tile, _super);
+
+  function Tile(level, lightId, shapeId, dirId, colorId) {
+    var _this = _super.call(this, level) || this;
+
+    _this.shapeGeometry = null;
+    _this.isMovingToTarget = false;
+    _this.level = level;
+    _this.lightId = lightId;
+    _this.shapeId = shapeId;
+    _this.dirId = dirId;
+    _this.colorId = colorId;
+    return _this;
   }
 
   Tile.prototype.update = function (dt) {
+    _super.prototype.update.call(this, dt);
+
     this.moveToTargetPos(dt);
+    this.updateShapeGeometry();
   };
 
-  Tile.prototype.draw = function (renderer) {
-    var ts = this.level.data.tileSize;
-    renderer.setTexture(this.level.tileTextures[1]);
-    renderer.darwRect(this.pos.x, this.pos.y, ts, ts, 0, 0.5, 0.5);
+  Tile.prototype.draw = function (renderer) {};
 
-    if (this.type >= 1) {
-      renderer.setTexture(this.level.tileTextures[this.type]);
-      renderer.darwRect(this.pos.x, this.pos.y, ts, ts, 0, 0.5, 0.5);
+  Tile.prototype.drawShapeGeometry = function (renderer) {
+    if (this.shapeGeometry) {
+      renderer.setColor(new math_1.Vec4(1, 1, 1, 1));
+      renderer.drawLines(this.shapeGeometry.points, 2);
+    }
+  };
+
+  Tile.prototype.updateShapeGeometry = function () {
+    if (this.shapeGeometry) {
+      var gt = this.globalTransform;
+      var updatedShape = Tile.createTileShape(this.shapeId, gt.pos.x, gt.pos.y, this.level.data.tileSize * 0.6, this.level.data.tileSize * 0.6, Tile.tileRotation(this.dirId));
+      this.shapeGeometry.points = updatedShape.points;
     }
   };
 
   Tile.prototype.moveToTargetPos = function (dt) {
     if (this.isMovingToTarget === false) return;
+    var size = this.level.data.tileSize;
     var speed = 6;
-    var moveDir = math_1.Vec2.sub(this.targetPos, this.pos).normalise();
-    this.pos.add({
-      x: moveDir.x * dt * this.size.x * speed,
-      y: moveDir.y * dt * this.size.y * speed
-    }); // snap the position to target when its close enough.
+    var moveDir = math_1.Vec2.sub(this.targetPos, this.transform.pos).normalise();
+    this.transform.move(moveDir.x * dt * size * speed, moveDir.y * dt * size * speed); // snap the position to target when its close enough.
 
-    if (Math.abs(this.pos.x - this.targetPos.x) < 4) this.pos.x = this.targetPos.x;
-    if (Math.abs(this.pos.y - this.targetPos.y) < 4) this.pos.y = this.targetPos.y;
+    if (Math.abs(this.transform.pos.x - this.targetPos.x) < 4) this.transform.setPosX(this.targetPos.x);
+    if (Math.abs(this.transform.pos.y - this.targetPos.y) < 4) this.transform.setPosY(this.targetPos.y); // check if we are at the target position
 
-    if (this.pos.x == this.targetPos.x && this.pos.y == this.targetPos.y) {
+    if (this.transform.pos.x == this.targetPos.x && this.transform.pos.y == this.targetPos.y) {
       this.isMovingToTarget = false;
       if (this.onMoveFinished) this.onMoveFinished(this);
     }
   };
 
   Tile.prototype.move = function (dir) {
-    var index = this.level.posToIndex(this.pos).add(dir);
+    var index = this.level.posToIndex(this.transform.pos).add(dir);
     this.targetPos = this.level.indexToPos(index);
     this, this.isMovingToTarget = true;
   };
 
   Tile.prototype.moveWith = function (dir, withIndex) {
-    var index = this.level.posToIndex(this.pos);
+    var index = this.level.posToIndex(this.transform.pos);
 
     if (index.y == withIndex.y && dir.x !== 0 || index.x == withIndex.x && dir.y !== 0) {
       this.move(dir);
@@ -3097,23 +3280,113 @@ function () {
     return false;
   };
 
-  return Tile;
-}();
+  Tile.tileRotation = function (shape) {
+    switch (shape) {
+      case TILE_DIR.RIGHT:
+        return 0;
 
-var LightTile =
+      case TILE_DIR.DOWN:
+        return Math.PI / 2;
+      // 90 deg cw
+
+      case TILE_DIR.LEFT:
+        return Math.PI;
+      // 180 deg cw
+
+      case TILE_DIR.UP:
+        return Math.PI + Math.PI / 2;
+      // 270 deg cw
+
+      default:
+        return 0;
+    }
+  };
+
+  Tile.createTileShape = function (shape, xPos, yPos, width, height, rot) {
+    switch (shape) {
+      case TILE_SHAPE.SOLID:
+        return math_1.Shape.makeBox(xPos, yPos, width, height, rot, false);
+
+      case TILE_SHAPE.EMITTER:
+      case TILE_SHAPE.RECEIVER:
+        return math_1.Shape.makeBox(xPos, yPos, width, height, rot, true);
+
+      case TILE_SHAPE.CORNER:
+        return math_1.Shape.makeAngleTriangle(xPos, yPos, width, height, rot);
+
+      default:
+        return null;
+    }
+  };
+
+  Tile.tileGeometries = [];
+  return Tile;
+}(GameObject);
+
+var BlockTile =
 /** @class */
 function (_super) {
-  __extends(LightTile, _super);
+  __extends(BlockTile, _super);
 
-  function LightTile(level, pos, size, type) {
-    var _this = _super.call(this, level, pos, size, type) || this;
+  function BlockTile(level, lightId, shapeId, dirId, colorId) {
+    var _a;
 
-    _this.lightDir = LightDir.NONE;
-    _this.lightPoints = [];
+    var _this = _super.call(this, level, lightId, shapeId, dirId, colorId) || this;
+
+    var rot = Tile.tileRotation(dirId);
+    _this.shapeGeometry = Tile.createTileShape(_this.shapeId, _this.transform.pos.x, _this.transform.pos.y, _this.level.data.tileSize, _this.level.data.tileSize, rot);
+
+    if (((_a = _this.shapeGeometry) === null || _a === void 0 ? void 0 : _a.points.length) > 0) {
+      _this.checkForChangesPerFrame(true);
+
+      Tile.tileGeometries.push(_this.shapeGeometry);
+    }
+
     return _this;
   }
 
-  Object.defineProperty(LightTile.prototype, "color", {
+  BlockTile.prototype.draw = function (renderer) {
+    var gt = this.globalTransform;
+    var pos = gt.pos;
+    var scale = gt.scale;
+    var tsx = this.level.data.tileSize * scale.x;
+    var tsy = this.level.data.tileSize * scale.y; // what about if the global transform has rotated... add rotation?
+
+    var rot = Tile.tileRotation(this.dirId);
+    renderer.setColor(new math_1.Vec4(1, 1, 1, 0.5));
+    renderer.setTexture(this.level.tileTextures[1]);
+    renderer.darwRect(pos.x, pos.y, tsx, tsy, rot, 0.5, 0.5);
+    this.drawShapeGeometry(renderer);
+  };
+
+  return BlockTile;
+}(Tile);
+
+var EmitterTile =
+/** @class */
+function (_super) {
+  __extends(EmitterTile, _super);
+
+  function EmitterTile(level, lightId, shapeId, dirId, colorId) {
+    var _a;
+
+    var _this = _super.call(this, level, lightId, shapeId, dirId, colorId) || this;
+
+    _this.lightRays = [];
+    _this.allLightRays = [];
+    var rot = Tile.tileRotation(_this.dirId);
+    _this.shapeGeometry = Tile.createTileShape(_this.shapeId, _this.transform.pos.x, _this.transform.pos.y, _this.level.data.tileSize, _this.level.data.tileSize, rot);
+
+    if (((_a = _this.shapeGeometry) === null || _a === void 0 ? void 0 : _a.points.length) > 0) {
+      _this.checkForChangesPerFrame(true);
+
+      Tile.tileGeometries.push(_this.shapeGeometry);
+    }
+
+    return _this;
+  }
+
+  Object.defineProperty(EmitterTile.prototype, "color", {
     get: function get() {
       var _a;
 
@@ -3123,241 +3396,96 @@ function (_super) {
     configurable: true
   });
 
-  LightTile.prototype.draw = function (renderer) {
+  EmitterTile.prototype.update = function (dt) {
+    _super.prototype.update.call(this, dt);
+  };
+
+  EmitterTile.prototype.updateLights = function (dt) {
+    var _a;
+
+    var gt = this.globalTransform;
+    var rayDir = this.dirToVec(this.dirId);
+    var rayOffset = math_1.Vec2.negate(rayDir).scale(6);
+    gt.move(rayOffset.x, rayOffset.y);
+
+    if (this.shapeId == TILE_SHAPE.EMITTER) {
+      this.lightRays = this.makeRayLine(gt.pos, rayDir, 4, 3);
+      this.allLightRays = [];
+
+      for (var i = 0; i < this.lightRays.length; i++) {
+        var r = this.lightRays[i];
+        r.castToShapes(Tile.tileGeometries, 10);
+
+        (_a = this.allLightRays).push.apply(_a, __spread(r.rays()));
+      }
+    }
+  };
+
+  EmitterTile.prototype.draw = function (renderer) {
     _super.prototype.draw.call(this, renderer);
 
+    var gt = this.globalTransform;
+    var pos = gt.pos;
+    var scale = gt.scale;
+    var tsx = this.level.data.tileSize * scale.x;
+    var tsy = this.level.data.tileSize * scale.y;
     renderer.saveState(true);
-    var color = new math_1.Vec4(this.color.x, this.color.y, this.color.z, 0.5);
-    color.w = 0.5;
+    var color = new math_1.Vec4(this.color.x, this.color.y, this.color.z, 1);
     renderer.setColor(color);
-    renderer.darwRect(this.pos.x, this.pos.y, this.level.data.tileSize / 2, this.level.data.tileSize / 2, 0, 0.5, 0.5);
+    renderer.darwRect(pos.x, pos.y, tsx / 2, tsy / 2, 0, 0.5, 0.5);
+    this.drawLight(renderer);
+    renderer.setColor(new math_1.Vec4(0, 0, 0, 1));
+    this.drawShapeGeometry(renderer);
     renderer.popState();
   };
 
-  LightTile.prototype.drawLight = function (renderer) {
-    var e_4, _a;
+  EmitterTile.prototype.drawLight = function (renderer) {
+    var e_3, _a;
 
-    if (this.lightPoints.length == 0) return;
+    var _b, _c;
+
+    var color = new math_1.Vec4(this.color.x, this.color.y, this.color.z, 0.5);
+    renderer.saveState();
+    renderer.setColor(color);
 
     try {
-      for (var _b = __values(this.lightPoints), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var lps = _c.value;
-        var points = lps.map(function (z) {
-          return z.pos;
-        });
-        var colors = lps.map(function (z) {
-          return new math_1.Vec4(z.color.x, z.color.y, z.color.z, z.color.w);
-        });
-        colors[colors.length - 1].w = 0;
-        renderer.saveState(true);
-        renderer.setColor(new math_1.Vec4(this.color.x, this.color.y, this.color.z, 0.5));
-        var lineThickness = this.level.data.tileSize / 3;
-        renderer.drawLines(points, lineThickness, colors);
-        renderer.popState();
+      for (var _d = __values(this.allLightRays), _e = _d.next(); !_e.done; _e = _d.next()) {
+        var r = _e.value;
+        var d = Math.min((_c = (_b = r.hit) === null || _b === void 0 ? void 0 : _b.distance) !== null && _c !== void 0 ? _c : 2000);
+        var p0 = r.pos;
+        var p1 = math_1.Vec2.mul(r.dir, {
+          x: d,
+          y: d
+        }).add(r.pos);
+        renderer.drawLine(p0.x, p0.y, p1.x, p1.y, 3); // renderer.darwRect(tp0.x, tp0.y, 10, 10, 0, 0.5, 0.5);
       }
-    } catch (e_4_1) {
-      e_4 = {
-        error: e_4_1
+    } catch (e_3_1) {
+      e_3 = {
+        error: e_3_1
       };
     } finally {
       try {
-        if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+        if (_e && !_e.done && (_a = _d.return)) _a.call(_d);
       } finally {
-        if (e_4) throw e_4.error;
+        if (e_3) throw e_3.error;
       }
     }
+
+    renderer.popState();
   };
 
-  LightTile.prototype.calculateLightPoints = function () {
-    this.lightPoints = [];
-    if (this.lightDir == LightDir.NONE) return;
-    var dirVec = this.dirToVec(this.lightDir);
-    var ligtBeam = [];
-    this.lightPoints.push(ligtBeam);
-    ligtBeam.push({
-      dir: dirVec,
-      index: this.level.posToIndex(this.pos),
-      pos: new math_1.Vec2(this.pos.x, this.pos.y).sub({
-        x: dirVec.x * 9,
-        y: dirVec.y * 9
-      }),
-      color: this.color,
-      tile: null
-    });
-    this.traceLightPoints(ligtBeam, this.dirToVec(this.lightDir), this.pos);
-  };
-
-  LightTile.prototype.traceLightPoints = function (results, currentDir, pos) {
-    pos = new math_1.Vec2(pos.x, pos.y);
-    var ts = this.level.data.tileSize;
-    var hts = ts * 0.5;
-    var index = this.level.posToIndex(pos); // check if we are out of bounds
-    // if so, this will be the final point for the line to be added
-
-    if (index.x < 0 || index.x > this.level.data.cols || index.y < 0 || index.y > this.level.data.rows) {
-      results.push({
-        dir: new math_1.Vec2(0, 0),
-        index: index,
-        pos: pos,
-        color: this.color,
-        tile: null
-      });
-      return;
-    } // does a tile exist at this position?
-
-
-    var t = this.level.findTileAtIndex(index);
-    var isBlocker = false;
-    var nextDir = currentDir;
-    var offset = new math_1.Vec2();
-
-    if (t && t.type != TILE_SHAPE.NONE) {
-      var cPos = this.level.indexToPos(index);
-      var dirFromCenter = math_1.Vec2.sub(cPos, t.pos);
-      var distanceFromCenter = dirFromCenter.length();
-      if (Math.abs(currentDir.x) > 0) pos.x = t.pos.x;
-      if (Math.abs(currentDir.y) > 0) pos.y = t.pos.y; // TILE_SHAPE.CORNER_TL
-      //=====================================================
-
-      if (t.type == TILE_SHAPE.CORNER_TL) {
-        if (currentDir.x == 1) {
-          isBlocker = true;
-          offset.x -= hts - 6;
-        }
-
-        if (currentDir.y == 1) {
-          isBlocker = true;
-          offset.y -= hts - 6;
-        }
-
-        if (currentDir.x == -1) {
-          var bent = false;
-
-          if (distanceFromCenter >= 0 && distanceFromCenter <= hts - 7 - ts / 3 / 2) {
-            nextDir = new math_1.Vec2(currentDir.y, -currentDir.x);
-            offset.x += distanceFromCenter * currentDir.x;
-            bent = true;
-          } // console.log(`Distance: ${distanceFromCenter} \t ${bent}`);
-
-        }
-
-        if (currentDir.y == -1) {
-          nextDir = new math_1.Vec2(currentDir.y, -currentDir.x); // offset.y += distanceFromCenter * currentDir.x;
-        }
-      } // TILE_SHAPE.CORNER_TR
-      //=====================================================
-
-
-      if (t.type == TILE_SHAPE.CORNER_TR && currentDir.x == -1) {
-        isBlocker = true;
-        offset.x += hts - 6;
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_TR && currentDir.y == 1) {
-        isBlocker = true;
-        offset.y -= hts - 6;
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_TR && currentDir.x == 1) {
-        nextDir = new math_1.Vec2(currentDir.y, currentDir.x);
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_TR && currentDir.y == -1) {
-        nextDir = new math_1.Vec2(currentDir.y, -currentDir.x);
-      } // TILE_SHAPE.CORNER_BR
-      //=====================================================
-
-
-      if (t.type == TILE_SHAPE.CORNER_BR && currentDir.x == 1) {
-        nextDir = new math_1.Vec2(currentDir.y, -currentDir.x);
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_BR && currentDir.y == 1) {
-        nextDir = new math_1.Vec2(-currentDir.y, currentDir.x);
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_BR && currentDir.x == -1) {
-        isBlocker = true;
-        offset.x += hts - 6;
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_BR && currentDir.y == -1) {
-        isBlocker = true;
-        offset.y += hts - 6;
-      } // TILE_SHAPE.CORNER_BL
-      //=====================================================
-
-
-      if (t.type == TILE_SHAPE.CORNER_BL && currentDir.x == 1) {
-        isBlocker = true;
-        offset.x -= hts - 6;
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_BL && currentDir.y == 1) {
-        nextDir = new math_1.Vec2(currentDir.y, -currentDir.x);
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_BL && currentDir.x == -1) {
-        nextDir = new math_1.Vec2(-currentDir.y, currentDir.x);
-      }
-
-      if (t.type == TILE_SHAPE.CORNER_BL && currentDir.y == -1) {
-        isBlocker = true;
-        offset.y += hts - 6;
-      } // TILE_SHAPE.SOLID
-      //=====================================================
-
-
-      if (t.type == TILE_SHAPE.SOLID && currentDir.x == 1) {
-        isBlocker = true;
-      }
-
-      if (t.type == TILE_SHAPE.SOLID && currentDir.y == 1) {
-        isBlocker = true;
-      }
-
-      if (t.type == TILE_SHAPE.SOLID && currentDir.x == -1) {
-        isBlocker = true;
-      }
-
-      if (t.type == TILE_SHAPE.SOLID && currentDir.y == -1) {
-        isBlocker = true;
-      }
-    }
-
-    if (currentDir != nextDir || isBlocker) {
-      pos.x += offset.x;
-      pos.y += offset.y;
-      results.push({
-        dir: nextDir,
-        index: index,
-        pos: pos,
-        color: this.color,
-        tile: t
-      });
-    }
-
-    if (!isBlocker) {
-      var nextPos = math_1.Vec2.mul(nextDir, {
-        x: ts,
-        y: ts
-      }).add(pos);
-      this.traceLightPoints(results, nextDir, nextPos);
-    }
-  };
-
-  LightTile.prototype.dirToVec = function (dir) {
+  EmitterTile.prototype.dirToVec = function (dir) {
     switch (dir) {
-      case LightDir.LEFT:
+      case TILE_DIR.LEFT:
         return new math_1.Vec2(-1, 0);
 
-      case LightDir.UP:
+      case TILE_DIR.UP:
         return new math_1.Vec2(0, -1);
 
-      case LightDir.RIGHT:
+      case TILE_DIR.RIGHT:
         return new math_1.Vec2(1, 0);
 
-      case LightDir.DOWN:
+      case TILE_DIR.DOWN:
         return new math_1.Vec2(0, 1);
 
       default:
@@ -3365,7 +3493,20 @@ function (_super) {
     }
   };
 
-  return LightTile;
+  EmitterTile.prototype.makeRayLine = function (pos, dir, count, spacing) {
+    var rays = [];
+    var pDir = math_1.Vec2.perpendicular(dir);
+    var min = Math.ceil(count / 2);
+    var max = Math.ceil(count / 2);
+
+    for (var i = -min; i <= max; i++) {
+      rays.push(new math_1.Ray(math_1.Vec2.add(pos, math_1.Vec2.scale(pDir, i * spacing)), dir));
+    }
+
+    return rays;
+  };
+
+  return EmitterTile;
 }(Tile);
 
 var LightBender =
@@ -3378,11 +3519,22 @@ function (_super) {
 
     _this.currentLevelIndex = 0;
     _this.tileTextures = {};
+    _this.elapsedTime = 0;
+    _this.world = new GameObject(null);
+
+    _this.world.transform.setPos(_this.canvas.width / 2, _this.canvas.height / 2);
+
     _this.currentLevel = new Level(levels_1.levels[_this.currentLevelIndex]);
     _this.currentLevel.tileTextures = _this.tileTextures;
 
+    _this.currentLevel.setParent(_this.world);
+
     _this.loadLevel();
 
+    console.log("hw: " + _this.canvas.width / 2);
+    console.log("hh: " + _this.canvas.height / 2);
+    console.log(_this.world.globalTransform.pos);
+    console.log(_this.currentLevel.globalTransform.pos);
     return _this;
   }
 
@@ -3399,18 +3551,8 @@ function (_super) {
             _a.sent();
 
             this.tileTextures[0] = null;
-            this.tileTextures[1] = new texture_1.Texture2D(this.gl);
-            this.tileTextures[1].load(tile_type_1_png_1.default);
-            this.tileTextures[2] = new texture_1.Texture2D(this.gl);
-            this.tileTextures[2].load(tile_type_2_png_1.default);
-            this.tileTextures[3] = new texture_1.Texture2D(this.gl);
-            this.tileTextures[3].load(tile_type_3_png_1.default);
-            this.tileTextures[4] = new texture_1.Texture2D(this.gl);
-            this.tileTextures[4].load(tile_type_4_png_1.default);
-            this.tileTextures[5] = new texture_1.Texture2D(this.gl);
-            this.tileTextures[5].load(tile_type_5_png_1.default);
-            this.tileTextures[6] = new texture_1.Texture2D(this.gl);
-            this.tileTextures[6].load(tile_type_solid_png_1.default);
+            this.tileTextures[TILE_SHAPE.EMPTY] = new texture_1.Texture2D(this.gl);
+            this.tileTextures[TILE_SHAPE.EMPTY].load(tile_base_png_1.default);
             return [2
             /*return*/
             ];
@@ -3420,12 +3562,13 @@ function (_super) {
   };
 
   LightBender.prototype.update = function () {
-    var e_5, _a;
+    var e_4, _a, e_5, _b;
 
     _super.prototype.update.call(this);
 
     var kb = this.input.keyboard;
     var inputDir = new math_1.Vec2(0, 0);
+    this.elapsedTime += this.time.deltaTime;
     if (kb.wasKeyPressed(38)) inputDir.y = -1; // up arrow
     else if (kb.wasKeyPressed(40)) inputDir.y = 1; // down arrow
       else if (kb.wasKeyPressed(37)) inputDir.x = -1; // left arrow
@@ -3436,9 +3579,28 @@ function (_super) {
     }
 
     try {
-      for (var _b = __values(this.currentLevel.tiles), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var t = _c.value;
+      // update movement of all tiles
+      for (var _c = __values(this.currentLevel.tiles), _d = _c.next(); !_d.done; _d = _c.next()) {
+        var t = _d.value;
         t.update(this.time.deltaTime);
+      }
+    } catch (e_4_1) {
+      e_4 = {
+        error: e_4_1
+      };
+    } finally {
+      try {
+        if (_d && !_d.done && (_a = _c.return)) _a.call(_c);
+      } finally {
+        if (e_4) throw e_4.error;
+      }
+    }
+
+    try {
+      // update the lights
+      for (var _e = __values(this.currentLevel.tiles), _f = _e.next(); !_f.done; _f = _e.next()) {
+        var t = _f.value;
+        if (t instanceof EmitterTile) t.updateLights(this.time.deltaTime);
       }
     } catch (e_5_1) {
       e_5 = {
@@ -3446,13 +3608,11 @@ function (_super) {
       };
     } finally {
       try {
-        if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+        if (_f && !_f.done && (_b = _e.return)) _b.call(_e);
       } finally {
         if (e_5) throw e_5.error;
       }
     }
-
-    this.currentLevel.calculateLightPoints();
   };
 
   LightBender.prototype.draw = function () {
@@ -3462,48 +3622,85 @@ function (_super) {
     this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     this.renderer2d.begin();
     this.drawBackgroundGrid();
-    this.drawLightBeams();
     this.drawTiles();
     this.renderer2d.end();
   };
 
   LightBender.prototype.drawBackgroundGrid = function () {
-    var ts = this.currentLevel.data.tileSize;
-    var nx = this.currentLevel.data.cols - 2; // Math.floor(this.canvas.width / ts);
-
-    var ny = this.currentLevel.data.rows - 2; // Math.floor(this.canvas.height/ ts);
-
-    var xo = (this.canvas.width - nx * ts) * 0.5;
-    var yo = (this.canvas.height - ny * ts) * 0.5;
+    var gt = this.currentLevel.globalTransform;
+    var pos = gt.pos;
+    var scale = gt.scale;
+    var tsx = this.currentLevel.data.tileSize * scale.x;
+    var tsy = this.currentLevel.data.tileSize * scale.y;
+    var minX = 0;
+    var minY = 0;
+    var maxX = this.currentLevel.data.cols;
+    var maxY = this.currentLevel.data.rows;
     this.renderer2d.saveState(true); // draw background:
-    // const mc = new Vec4(255/255, 232/255, 206/255, 1);
 
     var oc = new math_1.Vec4(255 / 255, 255 / 255, 255 / 255, 0.2);
-    this.renderer2d.setColor(oc);
-    var colors = [new math_1.Vec4(oc.x, oc.y, oc.z, 0), new math_1.Vec4(oc.x, oc.y, oc.z, oc.w), new math_1.Vec4(oc.x, oc.y, oc.z, oc.w), new math_1.Vec4(oc.x, oc.y, oc.z, 0)];
+    var colors = [new math_1.Vec4(oc.x, oc.y, oc.z, 0), new math_1.Vec4(oc.x, oc.y, oc.z, oc.w), new math_1.Vec4(oc.x, oc.y, oc.z, oc.w), new math_1.Vec4(oc.x, oc.y, oc.z, 0)]; // vertical lines
 
-    for (var i = 0; i <= nx; i++) {
-      var points = [new math_1.Vec2(xo + i * ts, yo - 2 * ts), new math_1.Vec2(xo + i * ts, yo - 0), new math_1.Vec2(xo + i * ts, yo + ny * ts), new math_1.Vec2(xo + i * ts, yo + (ny + 2) * ts)];
+    for (var i = minX + 2; i <= maxX - 2; i++) {
+      var points = [new math_1.Vec2(pos.x + i * tsx, pos.y + (minY + 0) * tsy), new math_1.Vec2(pos.x + i * tsx, pos.y + (minY + 2) * tsy), new math_1.Vec2(pos.x + i * tsx, pos.y + (maxY - 2) * tsy), new math_1.Vec2(pos.x + i * tsx, pos.y + (maxY - 0) * tsy)];
       this.renderer2d.drawLines(points, 1, colors);
-    }
+    } // horizontal
 
-    for (var i = 0; i <= ny; i++) {
-      var points = [new math_1.Vec2(xo - 2 * ts, yo + i * ts), new math_1.Vec2(xo - 0, yo + i * ts), new math_1.Vec2(xo + nx * ts, yo + i * ts), new math_1.Vec2(xo + (nx + 2) * ts, yo + i * ts)];
+
+    for (var i = minY + 2; i <= maxY - 2; i++) {
+      var points = [new math_1.Vec2(pos.x + (minX + 0) * tsx, pos.y + i * tsy), new math_1.Vec2(pos.x + (minX + 2) * tsx, pos.y + i * tsy), new math_1.Vec2(pos.x + (maxX - 2) * tsx, pos.y + i * tsy), new math_1.Vec2(pos.x + (maxX - 0) * tsx, pos.y + i * tsy)];
       this.renderer2d.drawLines(points, 1, colors);
     }
 
     this.renderer2d.popState();
   };
 
-  LightBender.prototype.drawLightBeams = function () {
+  LightBender.prototype.drawTiles = function () {
+    this.renderer2d.saveState(true);
+
+    for (var i = 0; i < this.currentLevel.tiles.length; i++) {
+      var tile = this.currentLevel.tiles[i];
+      tile.draw(this.renderer2d);
+    }
+
+    this.renderer2d.popState();
+  };
+
+  LightBender.prototype.moveActiveTile = function (dir) {
     var e_6, _a;
+
+    var _this = this;
+
+    if (this.currentLevel.movingTiles.size > 0 || this.currentLevel.activeTile === null) return;
+    var activeTileIndex = this.currentLevel.posToIndex(this.currentLevel.activeTile.transform.pos);
+    var targetTileIndex = math_1.Vec2.add(activeTileIndex, dir);
+    var zone = this.currentLevel.inZone(targetTileIndex);
+
+    var moveTileFinishedFunc = function moveTileFinishedFunc(tile) {
+      _this.currentLevel.movingTiles.delete(tile);
+
+      tile.onMoveFinished = null;
+
+      var index = _this.currentLevel.posToIndex(tile.transform.pos);
+
+      if (!(zone === null || zone === void 0 ? void 0 : zone.contains(index))) {
+        _this.currentLevel.activeTile = tile;
+      }
+    };
+
+    this.currentLevel.activeTile.move(dir);
+    this.currentLevel.activeTile.onMoveFinished = moveTileFinishedFunc;
+    this.currentLevel.activeTile = null;
+    if (zone === null) return;
 
     try {
       for (var _b = __values(this.currentLevel.tiles), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var tile = _c.value;
+        var t = _c.value;
+        var ti = this.currentLevel.posToIndex(t.transform.pos);
 
-        if (tile instanceof LightTile) {
-          tile.drawLight(this.renderer2d);
+        if (zone.contains(ti) && t.moveWith(dir, activeTileIndex)) {
+          this.currentLevel.movingTiles.add(t);
+          t.onMoveFinished = moveTileFinishedFunc;
         }
       }
     } catch (e_6_1) {
@@ -3519,115 +3716,77 @@ function (_super) {
     }
   };
 
-  LightBender.prototype.drawTiles = function () {
-    this.renderer2d.saveState(true);
-
-    for (var i = 0; i < this.currentLevel.tiles.length; i++) {
-      var tile = this.currentLevel.tiles[i];
-      tile.draw(this.renderer2d);
-    }
-
-    this.renderer2d.popState();
-  };
-
-  LightBender.prototype.moveActiveTile = function (dir) {
-    var e_7, _a;
-
-    var _this = this;
-
-    if (this.currentLevel.movingTiles.size > 0 || this.currentLevel.activeTile === null) return;
-    var activeTileIndex = this.currentLevel.posToIndex(this.currentLevel.activeTile.pos);
-    var targetTileIndex = math_1.Vec2.add(activeTileIndex, dir);
-    var zone = this.currentLevel.inZone(targetTileIndex);
-
-    var moveTileFinishedFunc = function moveTileFinishedFunc(tile) {
-      _this.currentLevel.movingTiles.delete(tile);
-
-      tile.onMoveFinished = null;
-
-      var index = _this.currentLevel.posToIndex(tile.pos);
-
-      if (!(zone === null || zone === void 0 ? void 0 : zone.contains(index))) {
-        _this.currentLevel.activeTile = tile;
-      }
-    };
-
-    this.currentLevel.activeTile.move(dir);
-    this.currentLevel.activeTile.onMoveFinished = moveTileFinishedFunc;
-    this.currentLevel.activeTile = null;
-    if (zone === null) return;
-
-    try {
-      for (var _b = __values(this.currentLevel.tiles), _c = _b.next(); !_c.done; _c = _b.next()) {
-        var t = _c.value;
-        var ti = this.currentLevel.posToIndex(t.pos);
-
-        if (zone.contains(ti) && t.moveWith(dir, activeTileIndex)) {
-          this.currentLevel.movingTiles.add(t);
-          t.onMoveFinished = moveTileFinishedFunc;
-        }
-      }
-    } catch (e_7_1) {
-      e_7 = {
-        error: e_7_1
-      };
-    } finally {
-      try {
-        if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
-      } finally {
-        if (e_7) throw e_7.error;
-      }
-    }
-  };
-
   LightBender.prototype.loadLevel = function () {
-    var level = this.currentLevel;
-    var layout = level.data.layout;
-    var lights = level.data.lights; // if the start tile is blank, set it to the default type.
+    var level = this.currentLevel; // const layout = level.data.layout;
+    // const lights = level.data.lights;
 
-    if (layout[level.data.startTile[1]][level.data.startTile[0]] === 0) layout[level.data.startTile[1]][level.data.startTile[0]] = 1;
+    var map = level.data.map;
+    var shapeIndex = 3;
+    var colorIndex = 2;
+    var dirIndex = 1;
+    var lightIndex = 0;
     var tileSize = level.data.tileSize;
-    var nx = level.data.cols - 2; // Math.floor(this.canvas.width / ts);
+    var levelWidth = tileSize * level.data.rows;
+    var levelHeight = tileSize * level.data.cols; // move the level position back
+    // so that it is positioned in the scenter of the..
+    // might need need to adjust this if we plan on preforming level rotations.
 
-    var ny = level.data.rows - 2; // Math.floor(this.canvas.height/ ts);
-
-    var xo = (this.canvas.width - (nx + 2) * tileSize) * 0.5;
-    var yo = (this.canvas.height - (ny + 2) * tileSize) * 0.5; // set the position of the level, so that we can calculate index's from positions.
-
-    level.pos = new math_1.Vec2(xo, yo);
-    this.currentLevel.tiles = [];
-    var rows = level.data.rows;
+    level.transform.move(-levelWidth / 2, -levelHeight / 2);
     var cols = level.data.cols;
+    var rows = level.data.rows;
 
     for (var yi = 0; yi < rows; yi++) {
       for (var xi = 0; xi < cols; xi++) {
-        var lightId = lights[yi][xi];
-        var tileType = layout[yi][xi];
-        if (lightId != 0) tileType = 1;
-        if (tileType === 0) continue;
-        var x = xo + xi * tileSize + tileSize * 0.5;
-        var y = yo + yi * tileSize + tileSize * 0.5;
-        var tile = null;
+        var lightId = parseInt(map[yi][xi][lightIndex]);
+        var dirId = parseInt(map[yi][xi][dirIndex]);
+        var colorId = parseInt(map[yi][xi][colorIndex]);
+        var shapeId = parseInt(map[yi][xi][shapeIndex]);
+        console.log(lightId, dirId, colorId, shapeId);
+        var tile = this.createTile(level, xi, yi, lightId, shapeId, dirId, colorId);
 
-        if (lightId > 0) {
-          tile = new LightTile(this.currentLevel, new math_1.Vec2(x, y), new math_1.Vec2(tileSize, tileSize), tileType);
-          tile.lightDir = Math.floor(lightId / 10);
-          tile.colorId = lightId - tile.lightDir * 10;
-        } else {
-          tile = new Tile(this.currentLevel, new math_1.Vec2(x, y), new math_1.Vec2(tileSize, tileSize), tileType);
+        if (tile) {
+          level.tiles.push(tile);
         }
 
-        if (xi === level.data.startTile[0] && yi === level.data.startTile[1]) this.currentLevel.activeTile = tile;
-        this.currentLevel.tiles.push(tile);
+        if (level.data.startTile[0] == xi && level.data.startTile[1] == yi) level.activeTile = tile;
       }
     }
+  };
+
+  LightBender.prototype.createTile = function (level, xIndex, yIndex, lightId, shapeId, dirId, colorId) {
+    var tileSize = level.data.tileSize;
+    var hTileSize = tileSize / 2;
+    var tile = null;
+
+    switch (shapeId) {
+      case TILE_SHAPE.NONE:
+        return;
+
+      case TILE_SHAPE.EMPTY:
+      case TILE_SHAPE.CORNER:
+      case TILE_SHAPE.SOLID:
+        tile = new BlockTile(level, lightId, shapeId, dirId, colorId);
+        break;
+
+      case TILE_SHAPE.RECEIVER:
+      case TILE_SHAPE.EMITTER:
+        tile = new EmitterTile(level, lightId, shapeId, dirId, colorId);
+        break;
+
+      default:
+        return;
+    }
+
+    var tilePos = new math_1.Vec2(xIndex * tileSize + hTileSize, yIndex * tileSize + hTileSize);
+    tile.transform.setPos(tilePos.x, tilePos.y);
+    return tile;
   };
 
   return LightBender;
 }(app_1.App);
 
 exports.LightBender = LightBender;
-},{"../../engine/app":"engine/app.ts","../../engine/math":"engine/math/index.ts","./levels":"demos/lightBender/levels.ts","./assets/tile-type-solid.png":"demos/lightBender/assets/tile-type-solid.png","./assets/tile-type-1.png":"demos/lightBender/assets/tile-type-1.png","./assets/tile-type-2.png":"demos/lightBender/assets/tile-type-2.png","./assets/tile-type-3.png":"demos/lightBender/assets/tile-type-3.png","./assets/tile-type-4.png":"demos/lightBender/assets/tile-type-4.png","./assets/tile-type-5.png":"demos/lightBender/assets/tile-type-5.png","../../engine/graphics/texture":"engine/graphics/texture.ts"}],"demos/rayCasting/index.ts":[function(require,module,exports) {
+},{"../../engine/app":"engine/app.ts","../../engine/math":"engine/math/index.ts","./levels":"demos/lightBender/levels.ts","./assets/tile-base.png":"demos/lightBender/assets/tile-base.png","../../engine/graphics/texture":"engine/graphics/texture.ts"}],"demos/rayCasting/index.ts":[function(require,module,exports) {
 "use strict";
 
 var __extends = this && this.__extends || function () {
@@ -3904,8 +4063,8 @@ function (_super) {
             // this.polygons.push( Shape.makeCircle(300, 500, 50,4));
             // this.polygons.push( Shape.makeCircle(400, 400, 50,4));
 
-            this.polygons.push(math_1.Shape.makeBox(left, top, right - left, bottom - top)); //this.polygons.push( Shape.makeBox(0, 0,ww, wh));
-            // this.polygons.push( Shape.makeLine(200, 100, 200, 400));
+            this.polygons.push(math_1.Shape.makeBox(this.canvas.width / 2, this.canvas.height / 2, right - left, bottom - top, 0));
+            this.polygons.push(math_1.Shape.makeBox(this.canvas.width / 2, this.canvas.height / 2, ww, wh, 0)); // this.polygons.push( Shape.makeLine(200, 100, 200, 400));
             // this.polygons.push( Shape.makeLine(500, 400, 500, 100));
             //this.polygons.push( Shape.makeLine(100, 300, 400, 300));
             //this.polygons.push( Shape.makeLine(400, 300, 100, 300));
@@ -3929,16 +4088,16 @@ function (_super) {
     // this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
     // this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
 
-    var s = this.elapsedTime * 0.1;
-    this.rays = this.makeRayLine(this.input.mouse.pos, new math_1.Vec2(Math.cos(s), Math.sin(s)), 10, 3); //this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
-    //this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
+    var s = this.elapsedTime * 0.25;
+    this.rays = this.makeRayLine(this.input.mouse.pos, new math_1.Vec2(Math.cos(s), Math.sin(s)), 10, 3); // this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
+    // this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
 
     this.rayHits = [];
     this.allRays = [];
 
     for (var i = 0; i < this.rays.length; i++) {
       var r = this.rays[i];
-      r.castToShapes(this.polygons, 10);
+      r.castToShapes(this.polygons, 5);
 
       (_a = this.rayHits).push.apply(_a, __spread(r.hits()));
 
@@ -4095,8 +4254,10 @@ function (_super) {
   RayCastingDemo.prototype.makeRayLine = function (pos, dir, count, spacing) {
     var rays = [];
     var pDir = math_1.Vec2.perpendicular(dir);
+    var min = -Math.floor(count / 2);
+    var max = Math.ceil(count / 2);
 
-    for (var i = 0; i < count; i++) {
+    for (var i = min; i < max; i++) {
       rays.push(new math_1.Ray(math_1.Vec2.add(pos, math_1.Vec2.scale(pDir, i * spacing)), dir));
     }
 
@@ -4585,7 +4746,7 @@ function (_super) {
     this.renderer2d.setTexture(this.image);
     this.renderer2d.setColor(new math_1.Vec4(1, 1, 1, 1));
     this.renderer2d.darwRect(size / 2, size / 2, size * 0.75, size * 0.75, this.rot, 0.5, 0.5);
-    this.renderer2d.drawLines(math_1.Shape.makeBox(1, 1, size - 2, size - 2).points, 2);
+    this.renderer2d.drawLines(math_1.Shape.makeBox(size / 2, size / 2, size - 2, size - 2, 0).points, 2);
     this.renderer2d.popState();
     this.renderer2d.end();
     this.renderTexture.disable(); // ================================================
@@ -4737,7 +4898,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "63262" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "65135" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

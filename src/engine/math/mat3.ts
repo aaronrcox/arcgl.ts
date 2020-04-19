@@ -18,6 +18,7 @@ export class Mat3 implements IMat3 {
     get right(): Vec2 { return new Vec2(this[0], this[1]); }
     get up(): Vec2 { return new Vec2(this[4], this[5]); }
     get pos(): Vec2 { return new Vec2(this[6], this[7]); }
+    get scale(): Vec2 { return new Vec2( this.right.length(), this.up.length() )}
 
     static row(mat: IMat3, i: number): Vec3 {
         const ri = (i * 3);
@@ -31,8 +32,14 @@ export class Mat3 implements IMat3 {
     constructor(mat3: IMat3) {
         for(let i=0; i<9; i++)
             this[i] = mat3[i];
+    }
 
-        this.mul = this.mul.bind(this);
+    static identity() {
+        return new Mat3([
+            1, 0, 0,
+            0, 1, 0,
+            0, 0, 1
+        ]);
     }
 
     static translation(x: number, y: number): Mat3 {
@@ -40,7 +47,7 @@ export class Mat3 implements IMat3 {
             1, 0, 0,
             0, 1, 0,
             x, y, 1
-        ])
+        ]);
     }
 
     static rotation(rot: number): Mat3 {
@@ -109,8 +116,44 @@ export class Mat3 implements IMat3 {
         // }
     }
 
-    mul(rhs: Mat3): Mat3 {
-        const result = Mat3.mul(this, rhs);
-        return result;
+    // mul(rhs: Mat3): Mat3 {
+    //     const result = Mat3.mul(this, rhs);
+    //     return result;
+    // }
+
+    copy(): Mat3 {
+        return new Mat3([
+            this[0], this[1], this[2],
+            this[3], this[4], this[5],
+            this[6], this[7], this[8]
+        ]);
+    }
+
+    equal(rhs: Mat3): boolean {
+        const e = Number.EPSILON;
+        for (let i = 0; i < 9; i++) {
+            if (Math.abs(this[i] - rhs[i]) > e) {
+                return false
+            }
+        }
+        return true;
+    }
+
+    move(tx: number, ty: number) {
+        this[6] += tx;
+        this[7] += ty;
+    }
+
+    setPos(tx: number, ty: number) {
+        this[6] = tx;
+        this[7] = ty;
+    }
+
+    setPosX(tx: number) {
+        this[6] = tx;
+    }
+
+    setPosY(ty: number) {
+        this[7] = ty;
     }
 }

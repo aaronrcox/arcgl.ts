@@ -49,9 +49,7 @@ export class RenderTextureDemo extends App {
         this.renderer2d.setColor(new Vec4(1,1,1,1));
 
         this.renderer2d.darwRect(size/2, size/2, size*0.75, size*0.75, this.rot, 0.5, 0.5);
-        this.renderer2d.drawLines( Shape.makeBox(1, 1, size-2, size-2).points, 2);
-
-        
+        this.renderer2d.drawLines( Shape.makeBox(size/2, size/2, size-2, size-2, 0).points, 2);
 
         this.renderer2d.popState();
         this.renderer2d.end();

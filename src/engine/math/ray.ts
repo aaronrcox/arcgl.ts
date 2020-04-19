@@ -74,7 +74,7 @@ export class Ray {
         return true;
     }
 
-    castToShapes(shapes: Shape[], numReflections: number = 0): boolean {
+    castToShapes(shapes: Shape[], numReflections: number = 0, shouldRefletCallback: (hit: RayHit) => boolean = null): boolean {
         let bestHit: RayHit = null;
         this.hit = null;
 
@@ -94,8 +94,16 @@ export class Ray {
         }
 
         this.hit = bestHit;
-        if(numReflections > 0 && this.hit)
-            this.hit.reflectedRay.castToShapes(shapes, numReflections -1);
+        
+        if(numReflections > 0 && this.hit) {
+            const shouldReflect = bestHit == null || shouldRefletCallback === null || shouldRefletCallback(bestHit);
+            if(shouldReflect)
+                this.hit.reflectedRay.castToShapes(shapes, numReflections -1);
+            // else
+            //     this.hit.reflectedRay = null;
+
+        }
+            
         
         return this.hit !== null;
     }

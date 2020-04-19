@@ -1,30 +1,23 @@
 import { App } from "../../engine/app";
-import { Vec4, Vec2, Rect } from "../../engine/math";
+import { Vec4, Vec2, Rect, Mat3, Shape, Vec3, Ray, IVec2, RayHit } from "../../engine/math";
 import { levels, ILevelData } from './levels';
 
 // import assets
-import tileTypeSolidPng from './assets/tile-type-solid.png';
-import tileImage1Png from './assets/tile-type-1.png';
-import tileImage2Png from './assets/tile-type-2.png';
-import tileImage3Png from './assets/tile-type-3.png';
-import tileImage4Png from './assets/tile-type-4.png';
-import tileImage5Png from './assets/tile-type-5.png';
+import tileBasePng from './assets/tile-base.png';
 
 import { Texture2D } from "../../engine/graphics/texture";
-import { Renderer2d, RenderMode } from "../../engine/graphics/renderer2d";
-
-const backgroundColor = new Vec4(236/255, 239/255, 241/255, 1.0);
-const backgroundLineColor = new Vec4(1, 1, 1, 1);
+import { Renderer2d } from "../../engine/graphics/renderer2d";
 
 const lightColors: {[key: number]: Vec4} = {
-    1: new Vec4(255/255, 138/255, 128/255, 1),  // red ff8a80
-    2: new Vec4(43/255, 187/255, 173/255, 1),   // green 2bbbad
-    3: new Vec4(179/255, 136/255, 255/255, 1),  // purple b388ff
-    4: new Vec4(149/255, 158/255, 255/255, 1),  // light blue 8c9eff
-    5: new Vec4(63/255, 114/255, 155/255, 1),   // dark blue 3f729b
+    1: new Vec4(255/255, 255/255, 255/255, 1),  // white ff8a80
+    2: new Vec4(255/255, 138/255, 128/255, 1),  // red ff8a80
+    3: new Vec4(43/255, 187/255, 173/255, 1),   // green 2bbbad
+    4: new Vec4(179/255, 136/255, 255/255, 1),  // purple b388ff
+    5: new Vec4(149/255, 158/255, 255/255, 1),  // light blue 8c9eff
+    6: new Vec4(63/255, 114/255, 155/255, 1),   // dark blue 3f729b
 }
 
-enum LightDir {
+enum TILE_DIR {
     NONE = 0,
     LEFT = 1,
     UP = 2,
@@ -34,46 +27,91 @@ enum LightDir {
 
 enum TILE_SHAPE {
     NONE = 0, 
-    EMPTY = 1,
-    CORNER_TL = 2,
-    CORNER_TR = 3,
-    CORNER_BR = 4,
-    CORNER_BL = 5,
-    SOLID = 6
+    EMPTY,
+    SOLID,
+    CORNER,
+    EMITTER,
+    RECEIVER,
 }
 
-interface TileLightPoint {
-    dir: Vec2;
-    pos: Vec2;
-    index: Vec2;
-    color: Vec4;
-    tile: Tile;
+
+class GameObject
+{
+    parent: GameObject = null
+    children: GameObject[] = [];
+
+    transform: Mat3 = Mat3.identity();
+
+    get globalTransform(): Mat3 {
+        const transform = this.parent ? 
+            Mat3.mul(this.transform, this.parent.globalTransform) :    
+            this.transform;
+        return transform;
+    }
+
+    private lastTrasform: Mat3 = null;
+    private _isDirty: boolean = false;
+    private _dirtyCheck: boolean = false;
+    get isDirty() { return this._isDirty; }
+
+    constructor(parent: GameObject = null) {
+        this.setParent(parent);
+    }
+
+    update(dt: number) {
+        if(this._dirtyCheck) {
+            this._isDirty = this.lastTrasform?.equal(this.transform) == false;
+            this.lastTrasform = this.transform.copy();
+        }
+     }
+    draw(renderer2d: Renderer2d) { }
+
+    setParent(newParent: GameObject) {
+        this.parent?.removeChild(this);
+        this.parent = newParent;
+        this.parent?.addChild(this);
+    }
+
+    checkForChangesPerFrame(doCheck: boolean) {
+        this._dirtyCheck = doCheck;
+        this._isDirty = true;
+    }
+
+    private removeChild(child: GameObject) {
+        const index = this.children.indexOf(child);
+        if (index >= 0 ) this.children.splice(index, 1);
+    }
+
+    private addChild(child: GameObject) {
+        const index = this.children.indexOf(child);
+        if (index < 0) this.children.push(child);
+    }
 }
 
-class Level {
-    pos: Vec2;
+class Level extends GameObject {
+    
     data: ILevelData;
     tileTextures: {[key: number]: Texture2D} = {};
     tiles: Tile[] = [];
-
 
     activeTile: Tile;
     movingTiles: Set<Tile> = new Set();
 
     constructor(data: ILevelData) {
+        super();
         this.data = data;
     }
 
     posToIndex(pos: Vec2): Vec2 {
-        const x = Math.floor((pos.x - this.pos.x) / this.data.tileSize);
-        const y = Math.floor((pos.y - this.pos.y) / this.data.tileSize);
+        const x = Math.floor(pos.x / this.data.tileSize);
+        const y = Math.floor(pos.y / this.data.tileSize);
         return new Vec2(x, y);
     }
 
     indexToPos(index: Vec2): Vec2 {
         const hs = this.data.tileSize * 0.5;
-        const x = Math.floor(index.x * this.data.tileSize + this.pos.x + hs);
-        const y = Math.floor(index.y * this.data.tileSize + this.pos.y + hs);
+        const x = Math.floor(index.x * this.data.tileSize + hs);
+        const y = Math.floor(index.y * this.data.tileSize + hs);
         return new Vec2(x, y);
     }
 
@@ -86,78 +124,96 @@ class Level {
         return null;
     }
 
-    calculateLightPoints() {
-        for(const light of this.tiles) {
-            if(!(light instanceof LightTile)) 
-                continue;
-
-            light.calculateLightPoints();
-        }
-    }
-
     findTileAtIndex(index: Vec2): Tile {
         for(const t of this.tiles) {
-            const ti = this.posToIndex(t.pos);
+            const ti = this.posToIndex(t.transform.pos);
             if(ti.x === index.x && ti.y==index.y)
                 return t;
         }
     }
 
+    update(dt: number) {
+        super.update(dt);
+    }
+
+    draw() {
+
+    }
+
 }
 
-class Tile {
+class Tile extends GameObject {
 
     level: Level;
-    pos: Vec2;
-    size: Vec2;
-    type: number;
+    lightId: TILE_SHAPE;
+    shapeId: number;
+    dirId: number;
+    colorId: number;
 
+    size: Vec2;
+    shapeGeometry: Shape = null;
+
+    onMoveFinished: (tile: Tile) => void;
     isMovingToTarget: boolean = false;
     targetPos: Vec2;
 
-    onMoveFinished: (tile: Tile) => void;
+    static tileGeometries: Shape[] = [];
 
-    constructor(level: Level, pos: Vec2, size: Vec2, type: number) {
+    constructor(level: Level, lightId: number, shapeId: TILE_SHAPE, dirId: TILE_DIR, colorId: number) {
+        super(level);
         this.level = level;
-        this.pos = pos;
-        this.size = size;
-        this.targetPos = new Vec2(pos.x, pos.y);
-        this.type = type;
+        this.lightId = lightId;
+        this.shapeId = shapeId;
+        this.dirId = dirId;
+        this.colorId = colorId;
     }
 
     update(dt: number) {
+        super.update(dt);
         this.moveToTargetPos(dt);
+
+        this.updateShapeGeometry();
     }
 
-    draw(renderer: Renderer2d) {
-        const ts = this.level.data.tileSize;
+    draw(renderer: Renderer2d) {}
 
-        renderer.setTexture(this.level.tileTextures[1]);
-        renderer.darwRect(this.pos.x, this.pos.y, ts, ts, 0, 0.5, 0.5 );
-
-        if(this.type >= 1) {
-            renderer.setTexture(this.level.tileTextures[this.type]);
-            renderer.darwRect(this.pos.x, this.pos.y, ts, ts, 0, 0.5, 0.5 );
+    drawShapeGeometry(renderer: Renderer2d) {
+        if(this.shapeGeometry) {
+            renderer.setColor(new Vec4(1, 1, 1, 1));
+            renderer.drawLines(this.shapeGeometry.points, 2);
         }
-        
+    }
+
+    updateShapeGeometry() {
+        if(this.shapeGeometry) {
+            const gt = this.globalTransform;
+            const updatedShape = Tile.createTileShape(this.shapeId, gt.pos.x, gt.pos.y, 
+                this.level.data.tileSize * 0.6, 
+                this.level.data.tileSize * 0.6, Tile.tileRotation(this.dirId));
+
+            this.shapeGeometry.points = updatedShape.points;
+        }
     }
 
     private moveToTargetPos(dt: number) {
         if(this.isMovingToTarget === false)
             return;
+
+        const size = this.level.data.tileSize;
             
         const speed = 6;
-        const moveDir = Vec2.sub(this.targetPos, this.pos).normalise();
-        this.pos.add({x: moveDir.x * dt * this.size.x * speed, y: moveDir.y * dt * this.size.y * speed});
+        const moveDir = Vec2.sub(this.targetPos, this.transform.pos).normalise();
+        this.transform.move(moveDir.x * dt * size * speed, moveDir.y * dt * size * speed);
 
         // snap the position to target when its close enough.
-        if(Math.abs(this.pos.x - this.targetPos.x) < 4 )
-            this.pos.x = this.targetPos.x;
+        if(Math.abs(this.transform.pos.x - this.targetPos.x) < 4 )
+            this.transform.setPosX(this.targetPos.x);
 
-        if(Math.abs(this.pos.y - this.targetPos.y) < 4 )
-            this.pos.y = this.targetPos.y;
+        if(Math.abs(this.transform.pos.y - this.targetPos.y) < 4 )
+            this.transform.setPosY(this.targetPos.y);
 
-        if(this.pos.x == this.targetPos.x && this.pos.y == this.targetPos.y){
+        // check if we are at the target position
+        if(this.transform.pos.x == this.targetPos.x && this.transform.pos.y == this.targetPos.y){
             this.isMovingToTarget = false;
             if(this.onMoveFinished)
                 this.onMoveFinished(this);
@@ -165,13 +221,13 @@ class Tile {
     }
 
     move(dir: Vec2) {
-        const index = this.level.posToIndex(this.pos).add(dir);
+        const index = this.level.posToIndex(this.transform.pos).add(dir);
         this.targetPos = this.level.indexToPos(index);
         this,this.isMovingToTarget = true;
     }
 
     moveWith(dir: Vec2, withIndex: Vec2): boolean {
-        const index = this.level.posToIndex(this.pos);
+        const index = this.level.posToIndex(this.transform.pos);
 
         if((index.y == withIndex.y && dir.x !== 0) || (index.x == withIndex.x && dir.y !== 0)) {
             this.move(dir);
@@ -179,245 +235,170 @@ class Tile {
         }
 
         return false;
-    }    
+    }
+
+    static tileRotation(shape: TILE_DIR): number {
+        switch(shape) {
+            case TILE_DIR.RIGHT: return 0;
+            case TILE_DIR.DOWN: return Math.PI / 2; // 90 deg cw
+            case TILE_DIR.LEFT: return Math.PI; // 180 deg cw
+            case TILE_DIR.UP: return Math.PI + Math.PI / 2; // 270 deg cw
+            default: return 0;
+        }
+    }
+
+    static createTileShape(shape: TILE_SHAPE, xPos: number, yPos: number, width: number, height: number, rot: number): Shape {
+        switch(shape) {
+            case TILE_SHAPE.SOLID:
+                return Shape.makeBox(xPos, yPos, width, height, rot, false);
+            case TILE_SHAPE.EMITTER: 
+            case TILE_SHAPE.RECEIVER:
+                return Shape.makeBox(xPos, yPos, width, height, rot, true)
+            case TILE_SHAPE.CORNER: 
+                return Shape.makeAngleTriangle(xPos, yPos, width, height, rot);
+            default:
+                return null;
+        }
+    }
 }
 
-class LightTile extends Tile {
+class BlockTile extends Tile {
+    constructor(level: Level, lightId: number, shapeId: TILE_SHAPE, dirId: TILE_DIR, colorId: number) {
+        super(level, lightId, shapeId, dirId, colorId);
 
-    colorId: number;
-    lightDir: LightDir = LightDir.NONE;
-    lightPoints: Array<TileLightPoint[]> = [];
+        const rot = Tile.tileRotation(dirId);
+        this.shapeGeometry = Tile.createTileShape(this.shapeId, this.transform.pos.x, this.transform.pos.y, this.level.data.tileSize, this.level.data.tileSize, rot );
+
+        if(this.shapeGeometry?.points.length > 0) {
+            this.checkForChangesPerFrame(true);
+            Tile.tileGeometries.push(this.shapeGeometry);
+        }
+    }
+
+    draw(renderer: Renderer2d) {
+        const gt = this.globalTransform;
+        const pos = gt.pos;
+        const scale = gt.scale;
+
+        const tsx = this.level.data.tileSize * scale.x;
+        const tsy = this.level.data.tileSize * scale.y;
+
+        // what about if the global transform has rotated... add rotation?
+        const rot = Tile.tileRotation(this.dirId); 
+
+        renderer.setColor(new Vec4(1,1,1,0.5));
+        renderer.setTexture(this.level.tileTextures[1]);
+        renderer.darwRect(pos.x, pos.y, tsx, tsy, rot, 0.5, 0.5 );
+
+        this.drawShapeGeometry(renderer);
+    }
+}
+
+class EmitterTile extends Tile {
+
+    lightRays: Ray[] = [];
+    allLightRays: Ray[] = [];
 
     get color() { return lightColors[this.colorId] ?? new Vec4(1,1,1,1); }
 
-    constructor(level: Level, pos: Vec2, size: Vec2, type: number) {
-        super(level, pos, size, type);
+    constructor(level: Level, lightId: number, shapeId: TILE_SHAPE, dirId: TILE_DIR, colorId: number) {
+        super(level,lightId, shapeId, dirId, colorId);
+
+        const rot = Tile.tileRotation(this.dirId);
+        this.shapeGeometry = Tile.createTileShape(this.shapeId, this.transform.pos.x, this.transform.pos.y, this.level.data.tileSize, this.level.data.tileSize, rot);
+
+        if(this.shapeGeometry?.points.length > 0) {
+            this.checkForChangesPerFrame(true);
+            Tile.tileGeometries.push(this.shapeGeometry);
+        }
+    }
+
+    update(dt: number) {
+        super.update(dt);
+    }
+
+    updateLights(dt: number) {
+        const gt = this.globalTransform;
+        const rayDir = this.dirToVec(this.dirId);
+        const rayOffset = Vec2.negate(rayDir).scale(6);
+        gt.move(rayOffset.x, rayOffset.y)
+        
+        if(this.shapeId == TILE_SHAPE.EMITTER) {
+            this.lightRays = this.makeRayLine(gt.pos, rayDir, 4, 3);
+            this.allLightRays = [];
+    
+            for(let i=0; i<this.lightRays.length; i++) {
+                const r = this.lightRays[i];
+                r.castToShapes(Tile.tileGeometries, 10);
+                this.allLightRays.push(...r.rays());
+            }
+        }
     }
 
     draw(renderer: Renderer2d) {
         super.draw(renderer);
 
+        const gt = this.globalTransform;
+        const pos = gt.pos;
+        const scale = gt.scale;
+        const tsx = this.level.data.tileSize * scale.x;
+        const tsy = this.level.data.tileSize * scale.y;
+
         renderer.saveState(true);
 
-        const color = new Vec4(this.color.x, this.color.y, this.color.z, 0.5);
-        color.w = 0.5;
+        const color = new Vec4(this.color.x, this.color.y, this.color.z, 1);
 
         renderer.setColor(color);
-        renderer.darwRect(this.pos.x, this.pos.y, this.level.data.tileSize/2, this.level.data.tileSize/2, 0, 0.5, 0.5);
+        renderer.darwRect(pos.x, pos.y, tsx/2, tsy/2, 0, 0.5, 0.5);
+
+        this.drawLight(renderer);
+
+        renderer.setColor(new Vec4(0,0,0,1));
+        this.drawShapeGeometry(renderer);
 
         renderer.popState();
     }
 
-    
     drawLight(renderer: Renderer2d) {
+
+        const color = new Vec4(this.color.x, this.color.y, this.color.z, 0.5);
+        renderer.saveState();
+        renderer.setColor(color);
         
-        if (this.lightPoints.length == 0 )
-            return;
-
-        for(const lps of this.lightPoints) {
-            const points = lps.map(z => z.pos);
-            const colors = lps.map(z => new Vec4(z.color.x, z.color.y, z.color.z, z.color.w));
-            colors[colors.length-1].w = 0;
-    
-            renderer.saveState(true);
-            renderer.setColor(new Vec4(this.color.x, this.color.y, this.color.z, 0.5));
-            const lineThickness = this.level.data.tileSize/3
-            renderer.drawLines(points, lineThickness, colors);
-            renderer.popState();
-        }
-    }
-
-    calculateLightPoints() {
-        this.lightPoints = [];
-        if(this.lightDir == LightDir.NONE)
-            return;
-
-        const dirVec = this.dirToVec(this.lightDir);
-
-        const ligtBeam: TileLightPoint[] = [];
-        this.lightPoints.push(ligtBeam);
-
-        ligtBeam.push({
-            dir: dirVec,
-            index: this.level.posToIndex(this.pos),
-            pos: new Vec2(this.pos.x, this.pos.y).sub({x: dirVec.x * 9, y: dirVec.y * 9}),
-            color: this.color,
-            tile: null
-        });
-        this.traceLightPoints(ligtBeam, this.dirToVec(this.lightDir), this.pos);
-    }
-
-    private traceLightPoints(results: TileLightPoint[], currentDir: Vec2, pos: Vec2) {
-
-        pos = new Vec2(pos.x, pos.y);
-        const ts = this.level.data.tileSize;
-        const hts = ts * 0.5;
-
-        const index = this.level.posToIndex(pos);
-        
-        // check if we are out of bounds
-        // if so, this will be the final point for the line to be added
-        if( index.x < 0 || index.x > this.level.data.cols || 
-            index.y < 0 || index.y > this.level.data.rows) {
-
-            results.push({
-                dir: new Vec2(0, 0),
-                index: index,
-                pos: pos,
-                color: this.color,
-                tile: null
-            });
-
-            return;
-        }
-
-        // does a tile exist at this position?
-        const t = this.level.findTileAtIndex(index);
-
-        let isBlocker = false;
-        let nextDir = currentDir;
-        const offset = new Vec2();
-        
-        if(t && t.type != TILE_SHAPE.NONE)
-        {
-
-            const cPos = this.level.indexToPos(index);
-            const dirFromCenter = Vec2.sub(cPos, t.pos);
-            const distanceFromCenter = dirFromCenter.length();
-
-            if(Math.abs(currentDir.x) > 0)
-                pos.x = t.pos.x;
-
-            if(Math.abs(currentDir.y) > 0)
-                pos.y = t.pos.y;
-
-            // TILE_SHAPE.CORNER_TL
-            //=====================================================
-            if(t.type == TILE_SHAPE.CORNER_TL)
-            {
-                if(currentDir.x == 1) {
-                    isBlocker = true;
-                    offset.x -= hts - 6;
-                }
-                if(currentDir.y == 1) {
-                    isBlocker = true;
-                    offset.y -= hts - 6;
-                }
-                if(currentDir.x == -1) {
-                    let bent = false;
-                    if(distanceFromCenter >= 0 &&  distanceFromCenter <= hts - 7 - (ts/3/2)) {
-                        nextDir = new Vec2(currentDir.y,-currentDir.x);
-                        offset.x += distanceFromCenter * currentDir.x;
-                        bent = true;
-                    }
-
-                    // console.log(`Distance: ${distanceFromCenter} \t ${bent}`);
-                    
-                    
-                }
-                if(currentDir.y == -1) {
-                    nextDir = new Vec2(currentDir.y,-currentDir.x);
-                   // offset.y += distanceFromCenter * currentDir.x;
-                }
-            }
+        for(const r of this.allLightRays) {
+            const d = Math.min(r.hit?.distance ?? 2000);
+            const p0 = r.pos;
+            const p1 = Vec2.mul(r.dir, {x: d, y:d}).add(r.pos);
             
+            renderer.drawLine(p0.x, p0.y, p1.x, p1.y, 3);
 
-            // TILE_SHAPE.CORNER_TR
-            //=====================================================
-            if(t.type == TILE_SHAPE.CORNER_TR && currentDir.x ==-1) {
-                isBlocker = true;
-                offset.x += hts - 6;
-            }
-            if(t.type == TILE_SHAPE.CORNER_TR && currentDir.y == 1) {
-                isBlocker = true;
-                offset.y -= hts - 6;
-            }
-            if(t.type == TILE_SHAPE.CORNER_TR && currentDir.x == 1) {
-                nextDir = new Vec2(currentDir.y, currentDir.x);
-            }
-            if(t.type == TILE_SHAPE.CORNER_TR && currentDir.y == -1) {
-                nextDir = new Vec2(currentDir.y,-currentDir.x);
-            }
-
-            // TILE_SHAPE.CORNER_BR
-            //=====================================================
-            if(t.type == TILE_SHAPE.CORNER_BR && currentDir.x == 1) {
-                nextDir = new Vec2(currentDir.y,-currentDir.x);
-            }
-            if(t.type == TILE_SHAPE.CORNER_BR && currentDir.y == 1) {
-                nextDir = new Vec2(-currentDir.y, currentDir.x);
-            }
-            if(t.type == TILE_SHAPE.CORNER_BR && currentDir.x ==-1) {
-                isBlocker = true;
-                offset.x += hts - 6;
-            }
-            if(t.type == TILE_SHAPE.CORNER_BR && currentDir.y ==-1) {
-                isBlocker = true;
-                offset.y += hts - 6;
-            }
-
-            // TILE_SHAPE.CORNER_BL
-            //=====================================================
-            if(t.type == TILE_SHAPE.CORNER_BL && currentDir.x == 1) {
-                isBlocker = true;
-                offset.x -= hts - 6;
-            }
-            if(t.type == TILE_SHAPE.CORNER_BL && currentDir.y == 1) {
-                nextDir = new Vec2(currentDir.y,-currentDir.x);
-            }
-            if(t.type == TILE_SHAPE.CORNER_BL && currentDir.x ==-1) {
-                nextDir = new Vec2(-currentDir.y, currentDir.x);
-            }
-            if(t.type == TILE_SHAPE.CORNER_BL && currentDir.y == -1) {
-                isBlocker = true;
-                offset.y += hts - 6;
-            }
-
-            // TILE_SHAPE.SOLID
-            //=====================================================
-            if(t.type == TILE_SHAPE.SOLID && currentDir.x == 1) {
-                isBlocker = true;
-            }
-            if(t.type == TILE_SHAPE.SOLID && currentDir.y == 1) {
-                isBlocker = true;
-                
-            }
-            if(t.type == TILE_SHAPE.SOLID && currentDir.x ==-1) {
-                isBlocker = true;
-            }
-            if(t.type == TILE_SHAPE.SOLID && currentDir.y == -1) {
-                isBlocker = true;
-            }
+            // renderer.darwRect(tp0.x, tp0.y, 10, 10, 0, 0.5, 0.5);
         }
 
-        if(currentDir != nextDir || isBlocker) {
-            pos.x += offset.x;
-            pos.y += offset.y;
-            results.push({
-                dir: nextDir,
-                index: index,
-                pos: pos,
-                color: this.color,
-                tile: t
-            });
-        }
-        
-        if(!isBlocker) {
-            const nextPos = Vec2.mul(nextDir, {x: ts, y: ts}).add(pos);
-            this.traceLightPoints(results, nextDir, nextPos);
-        }
+        renderer.popState();
     }
-
-    dirToVec(dir: LightDir) {
+    
+    dirToVec(dir: TILE_DIR) {
         switch(dir) {
-            case LightDir.LEFT: return new Vec2(-1, 0);
-            case LightDir.UP: return new Vec2(0, -1);
-            case LightDir.RIGHT: return new Vec2(1, 0);
-            case LightDir.DOWN: return new Vec2(0, 1);
+            case TILE_DIR.LEFT: return new Vec2(-1, 0);
+            case TILE_DIR.UP: return new Vec2(0, -1);
+            case TILE_DIR.RIGHT: return new Vec2(1, 0);
+            case TILE_DIR.DOWN: return new Vec2(0, 1);
             default: return new Vec2(0, 0);
         }
     }
 
+    makeRayLine(pos: IVec2, dir: IVec2, count: number, spacing: number): Ray[] {
+        const rays: Ray[] = [];
+        const pDir = Vec2.perpendicular(dir);
+
+        const min = Math.ceil(count/2);
+        const max = Math.ceil(count/2);
+        for(let i=-min; i<=max; i++) {
+            rays.push( new Ray(Vec2.add(pos, Vec2.scale(pDir, i*spacing)), dir) )
+        }
+        return rays;
+    }
 }
 
 export class LightBender extends App {
@@ -426,14 +407,27 @@ export class LightBender extends App {
     currentLevel: Level;
 
     tileTextures: {[key: number]: Texture2D} = {};
+
+    world: GameObject;
+
+    elapsedTime: number = 0;
     
     constructor(htmlCanvasId: string) {
         super(htmlCanvasId);
 
+        this.world = new GameObject(null);
+        this.world.transform.setPos(this.canvas.width / 2, this.canvas.height / 2);
+
         this.currentLevel = new Level(levels[this.currentLevelIndex]);
         this.currentLevel.tileTextures = this.tileTextures;
+        this.currentLevel.setParent(this.world);
+
         this.loadLevel();
 
+        console.log(`hw: ${this.canvas.width / 2}`);
+        console.log(`hh: ${this.canvas.height / 2}`);
+        console.log(this.world.globalTransform.pos);
+        console.log(this.currentLevel.globalTransform.pos);
     }
 
     async loadAssets(): Promise<void> {
@@ -441,29 +435,16 @@ export class LightBender extends App {
 
         this.tileTextures[0] = null;
         
-        this.tileTextures[1] = new Texture2D(this.gl);
-        this.tileTextures[1].load(tileImage1Png);
-
-        this.tileTextures[2] = new Texture2D(this.gl);
-        this.tileTextures[2].load(tileImage2Png);
-
-        this.tileTextures[3] = new Texture2D(this.gl);
-        this.tileTextures[3].load(tileImage3Png);
-
-        this.tileTextures[4] = new Texture2D(this.gl);
-        this.tileTextures[4].load(tileImage4Png);
-
-        this.tileTextures[5] = new Texture2D(this.gl);
-        this.tileTextures[5].load(tileImage5Png);
-
-        this.tileTextures[6] = new Texture2D(this.gl);
-        this.tileTextures[6].load(tileTypeSolidPng);
+        this.tileTextures[TILE_SHAPE.EMPTY] = new Texture2D(this.gl);
+        this.tileTextures[TILE_SHAPE.EMPTY].load(tileBasePng);
     }
     
     update() {
         super.update();
         const kb = this.input.keyboard;
         const inputDir = new Vec2(0, 0);
+
+        this.elapsedTime += this.time.deltaTime;
 
         if(kb.wasKeyPressed(38)) inputDir.y = -1;       // up arrow
         else if(kb.wasKeyPressed(40)) inputDir.y =  1;  // down arrow
@@ -474,11 +455,16 @@ export class LightBender extends App {
             this.moveActiveTile(inputDir);
         }
 
+        // update movement of all tiles
         for(const t of this.currentLevel.tiles) {
             t.update(this.time.deltaTime);
         }
 
-        this.currentLevel.calculateLightPoints();
+        // update the lights
+        for(const t of this.currentLevel.tiles) {
+            if(t instanceof EmitterTile)
+                t.updateLights(this.time.deltaTime);
+        }
     }
 
     draw() {
@@ -488,43 +474,48 @@ export class LightBender extends App {
 
         this.renderer2d.begin();
         this.drawBackgroundGrid();
-        this.drawLightBeams();
         this.drawTiles();
         this.renderer2d.end();
     }
 
     drawBackgroundGrid() {
-        const ts = this.currentLevel.data.tileSize; 
-        const nx = this.currentLevel.data.cols-2; // Math.floor(this.canvas.width / ts);
-        const ny = this.currentLevel.data.rows-2; // Math.floor(this.canvas.height/ ts);
-        const xo = (this.canvas.width - nx * ts) * 0.5;
-        const yo = (this.canvas.height - ny * ts) * 0.5;
+
+        const gt = this.currentLevel.globalTransform;
+        const pos = gt.pos;
+        const scale = gt.scale;
+
+        const tsx = this.currentLevel.data.tileSize * scale.x;
+        const tsy = this.currentLevel.data.tileSize * scale.y;
+
+        const minX = 0;
+        const minY = 0;
+        const maxX = this.currentLevel.data.cols;
+        const maxY = this.currentLevel.data.rows;
 
         this.renderer2d.saveState(true);
 
         // draw background:
-        // const mc = new Vec4(255/255, 232/255, 206/255, 1);
         const oc = new Vec4(255/255, 255/255, 255/255, 0.2);
-
-        this.renderer2d.setColor(oc);
         const colors = [new Vec4(oc.x, oc.y, oc.z, 0), new Vec4(oc.x, oc.y, oc.z, oc.w), new Vec4(oc.x, oc.y, oc.z, oc.w), new Vec4(oc.x, oc.y, oc.z, 0)];
 
-        for(let i=0; i<=nx; i++) {
+        // vertical lines
+        for(let i=minX+2; i<=maxX-2; i++) {
             const points = [
-                new Vec2(xo + (i*ts), yo - (2 * ts)), 
-                new Vec2(xo + (i*ts), yo - 0), 
-                new Vec2(xo + (i*ts), yo + (ny * ts)), 
-                new Vec2(xo + (i*ts), yo + ((ny+2) * ts))
+                new Vec2(pos.x + (i*tsx), pos.y + ((minY + 0) * tsy)),
+                new Vec2(pos.x + (i*tsx), pos.y + ((minY + 2) * tsy)), 
+                new Vec2(pos.x + (i*tsx), pos.y + ((maxY - 2) * tsy)),
+                new Vec2(pos.x + (i*tsx), pos.y + ((maxY - 0) * tsy))
             ];
             this.renderer2d.drawLines(points, 1, colors);
         }
 
-        for(let i=0; i<=ny; i++) {
+        // horizontal
+        for(let i=minY+2; i<=maxY-2; i++) {
             const points = [
-                new Vec2(xo - (2 * ts), yo + (i*ts)),
-                new Vec2(xo - 0, yo + (i*ts)),
-                new Vec2(xo + (nx * ts), yo + (i*ts)),
-                new Vec2(xo + ((nx+2) * ts), yo + (i*ts))
+                new Vec2(pos.x + ((minX + 0) * tsx),  pos.y + (i*tsy)),
+                new Vec2(pos.x + ((minX + 2) * tsx),  pos.y + (i*tsy)),
+                new Vec2(pos.x + ((maxX - 2) * tsx),  pos.y + (i*tsy)),
+                new Vec2(pos.x + ((maxX - 0) * tsx),  pos.y + (i*tsy))
             ];
             this.renderer2d.drawLines(points, 1, colors);
         }
@@ -532,14 +523,6 @@ export class LightBender extends App {
         this.renderer2d.popState();
     }
 
-    drawLightBeams() {
-        
-        for(const tile of this.currentLevel.tiles) {
-            if(tile instanceof LightTile) {
-                tile.drawLight(this.renderer2d);
-            }
-        }
-    }
 
     drawTiles() {
 
@@ -560,14 +543,14 @@ export class LightBender extends App {
             return;
 
         
-        const activeTileIndex = this.currentLevel.posToIndex(this.currentLevel.activeTile.pos);
+        const activeTileIndex = this.currentLevel.posToIndex(this.currentLevel.activeTile.transform.pos);
         const targetTileIndex = Vec2.add(activeTileIndex, dir);
         const zone = this.currentLevel.inZone(targetTileIndex);
 
         const moveTileFinishedFunc = (tile: Tile) => {
             this.currentLevel.movingTiles.delete(tile);
             tile.onMoveFinished = null;
-            const index = this.currentLevel.posToIndex(tile.pos);
+            const index = this.currentLevel.posToIndex(tile.transform.pos);
             if(!zone?.contains(index)) {
                 this.currentLevel.activeTile = tile;
             }
@@ -582,7 +565,7 @@ export class LightBender extends App {
             return;
 
         for(const t of this.currentLevel.tiles) {
-            const ti = this.currentLevel.posToIndex(t.pos);
+            const ti = this.currentLevel.posToIndex(t.transform.pos);
             if(zone.contains(ti) && t.moveWith(dir, activeTileIndex) ) {
                 this.currentLevel.movingTiles.add(t);
                 t.onMoveFinished = moveTileFinishedFunc;
@@ -594,60 +577,82 @@ export class LightBender extends App {
 
     loadLevel() {
 
+        
         const level = this.currentLevel;
-        const layout = level.data.layout;
-        const lights = level.data.lights;
+        // const layout = level.data.layout;
+        // const lights = level.data.lights;
+        const map = level.data.map;
 
-        // if the start tile is blank, set it to the default type.
-        if( layout[level.data.startTile[1]][level.data.startTile[0]] === 0 )
-            layout[level.data.startTile[1]][level.data.startTile[0]] = 1;
+        const shapeIndex = 3;
+        const colorIndex = 2;
+        const dirIndex = 1;
+        const lightIndex = 0;
+
 
         const tileSize = level.data.tileSize;
-        const nx = level.data.cols-2; // Math.floor(this.canvas.width / ts);
-        const ny = level.data.rows-2; // Math.floor(this.canvas.height/ ts);
-        const xo = (this.canvas.width - (nx+2) * tileSize) * 0.5;
-        const yo = (this.canvas.height - (ny+2) * tileSize) * 0.5;
+        const levelWidth = tileSize * level.data.rows;
+        const levelHeight = tileSize * level.data.cols;
 
-        // set the position of the level, so that we can calculate index's from positions.
-        level.pos = new Vec2(xo, yo);
+        // move the level position back
+        // so that it is positioned in the scenter of the..
+        // might need need to adjust this if we plan on preforming level rotations.
+        level.transform.move(-levelWidth/2, -levelHeight/2);
 
-        this.currentLevel.tiles = [];
-
+        const cols = level.data.cols; 
         const rows = level.data.rows;
-        const cols = level.data.cols;
-        
+
         for(let yi = 0; yi<rows; yi++) {
             for(let xi = 0; xi<cols; xi++) {
 
-                let lightId = lights[yi][xi];
-                let tileType = layout[yi][xi];
 
-                if(lightId != 0 )
-                    tileType = 1;
                 
-                if(tileType === 0 )
-                    continue;
+                let lightId = parseInt(map[yi][xi][lightIndex]);
+                let dirId = parseInt(map[yi][xi][dirIndex]);
+                let colorId = parseInt(map[yi][xi][colorIndex]);
+                const shapeId = parseInt(map[yi][xi][shapeIndex]);
 
-                const x = xo + (xi * tileSize) + (tileSize * 0.5);
-                const y = yo + (yi * tileSize) + (tileSize * 0.5);
-                let tile = null;
-                
-                if( lightId > 0 ) {
-                    tile = new LightTile(this.currentLevel, new Vec2(x, y), new Vec2(tileSize, tileSize), tileType);
-                    tile.lightDir = Math.floor(lightId / 10);
-                    tile.colorId = lightId - (tile.lightDir * 10);
+                console.log(lightId, dirId, colorId, shapeId);
+
+                const tile = this.createTile(level, xi, yi, lightId, shapeId, dirId, colorId);
+                if(tile) {
+                    level.tiles.push(tile);
                 }
-                else {
-                    tile = new Tile(this.currentLevel, new Vec2(x, y), new Vec2(tileSize, tileSize), tileType);
-                }
-
-                if(xi === level.data.startTile[0] && yi === level.data.startTile[1])
-                    this.currentLevel.activeTile = tile;
-
-                this.currentLevel.tiles.push(tile);
                 
+                if( level.data.startTile[0] == xi && level.data.startTile[1] == yi)
+                    level.activeTile = tile;
+
             }
+
         }
+        
+    }
+
+    private createTile(level: Level, xIndex: number, yIndex: number, lightId: number, shapeId: TILE_SHAPE, dirId: TILE_DIR, colorId: number) {
+        
+
+        const tileSize = level.data.tileSize;
+        const hTileSize = tileSize / 2;
+
+        let tile = null;
+
+        switch(shapeId) {
+            case TILE_SHAPE.NONE:
+                return;
+            case TILE_SHAPE.EMPTY: 
+            case TILE_SHAPE.CORNER:
+            case TILE_SHAPE.SOLID:
+                tile = new BlockTile(level, lightId, shapeId, dirId, colorId); break;
+            case TILE_SHAPE.RECEIVER:
+            case TILE_SHAPE.EMITTER:
+                tile = new EmitterTile(level, lightId, shapeId, dirId, colorId); break;
+            default:
+                    return;
+        }
+
+        const tilePos = new Vec2(xIndex * tileSize + hTileSize, yIndex * tileSize + hTileSize);
+        tile.transform.setPos(tilePos.x, tilePos.y);     
+
+        return tile;
     }
 
 }

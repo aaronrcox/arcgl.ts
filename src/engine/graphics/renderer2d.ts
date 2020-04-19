@@ -333,7 +333,7 @@ export class Renderer2d {
         this.renderState = [];
         this.saveState(true);
 
-        console.log(`Flushes: ${this.numFlushes}`);
+        //console.log(`Flushes: ${this.numFlushes}`);
         this.numFlushes = 0;
     }
 
@@ -347,7 +347,10 @@ export class Renderer2d {
         const color = state.color ?? [Vec4.ONE, Vec4.ONE, Vec4.ONE, Vec4.ONE];
         const uvRect = state.uvRect ?? new Rect(0, 0, 1, 1);
 
-        const transform = Mat3.scale(width, height).mul(Mat3.rotation(rot)).mul(Mat3.translation(xPos, yPos));
+        const transform = 
+        Mat3.mul(Mat3.mul( Mat3.scale(width, height), 
+                          Mat3.rotation(rot) ), 
+                 Mat3.translation(xPos, yPos) );
 
         // calculate the position for each of the quads
         const tl: IVec3 = Mat3.transformPoint(transform, { x: (0 - xOrigin), y: (0 - yOrigin), z: 1 } );

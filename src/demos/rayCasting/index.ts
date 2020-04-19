@@ -41,8 +41,8 @@ export class RayCastingDemo extends App {
         // this.polygons.push( Shape.makeCircle(300, 500, 50,4));
         // this.polygons.push( Shape.makeCircle(400, 400, 50,4));
 
-        this.polygons.push( Shape.makeBox(left, top, right-left, bottom-top));
-        //this.polygons.push( Shape.makeBox(0, 0,ww, wh));
+        this.polygons.push( Shape.makeBox(this.canvas.width/2, this.canvas.height/2, right-left, bottom-top, 0));
+        this.polygons.push( Shape.makeBox(this.canvas.width/2, this.canvas.height/2,ww, wh, 0));
 
         // this.polygons.push( Shape.makeLine(200, 100, 200, 400));
         // this.polygons.push( Shape.makeLine(500, 400, 500, 100));
@@ -70,17 +70,17 @@ export class RayCastingDemo extends App {
         // this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
         // this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
 
-        const s = this.elapsedTime * 0.1;
+        const s = this.elapsedTime * 0.25;
         this.rays = this.makeRayLine(this.input.mouse.pos, new Vec2(Math.cos(s), Math.sin(s)), 10, 3);
-        //this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
-        //this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
+        // this.rays = this.makeRaysToShapes(this.input.mouse.pos.x, this.input.mouse.pos.y, this.polygons);
+        // this.rays = this.makeRayFan(this.input.mouse.pos.x, this.input.mouse.pos.y, 64);
 
         this.rayHits = [];
         this.allRays = [];
 
         for(let i=0; i<this.rays.length; i++) {
-            const r = this.rays[i]
-            r.castToShapes(this.polygons, 10);
+            const r = this.rays[i];
+            r.castToShapes(this.polygons, 5);
             this.rayHits.push(...r.hits());
             this.allRays.push(...r.rays());
         }
@@ -164,7 +164,9 @@ export class RayCastingDemo extends App {
         const rays: Ray[] = [];
         const pDir = Vec2.perpendicular(dir);
 
-        for(let i=0; i<count; i++) {
+        const min = -Math.floor(count / 2);
+        const max = Math.ceil(count / 2);
+        for(let i=min; i<max; i++) {
             rays.push(
                 new Ray(Vec2.add(pos, Vec2.scale(pDir, i*spacing)), dir)
             )

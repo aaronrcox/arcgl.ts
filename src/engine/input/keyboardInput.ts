@@ -10,11 +10,6 @@ export class KeyboardInput {
         document.addEventListener("keydown", this.keyDownEventHandler);
         document.addEventListener("keyup", this.keyUpEventHandler);
         
-        // this.canvas.onkeydown = this.keyDownEventHandler;
-        // this.canvas.onkeydown = this.keyUpEventHandler;
-
-        //this.canvas.addEventListener("keydown", this.keyDownEventHandler);
-        //this.canvas.addEventListener("keyup", this.keyUpEventHandler);
     }
 
     destroy() {
@@ -39,8 +34,6 @@ export class KeyboardInput {
     }
 
     private keyDownEventHandler = (e: KeyboardEvent) => {
-        
-        console.log(e.key + ' : ' + e.keyCode);
         this.keyState[e.keyCode] = true;
     }
 

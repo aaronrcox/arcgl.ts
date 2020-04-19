@@ -105,7 +105,8 @@ export class Vec2 implements IVec2 {
 
     scale(rhs: number) {
         this.x *= rhs;
-        this.y *- rhs;
+        this.y *= rhs;
+        return this;
     }
 
     negate() {

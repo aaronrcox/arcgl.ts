@@ -1,3 +1,4 @@
+import { Vec2 } from "./vec2";
 
 export interface IVec3 {
     x: number;
@@ -16,7 +17,8 @@ export class Vec3 implements IVec3 {
     get x() { return this[0]; }
     get y() { return this[1]; }
     get z() { return this[2]; }
-    get xyz() { return [this.x, this.y, this.z]; }
+    get xy() { return new Vec2(this[0], this[1]); }
+    
 
     set x(value: number) { this[0] = value; }
     set y(value: number) { this[1] = value; }

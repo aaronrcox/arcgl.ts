@@ -459,6 +459,7 @@ export class Renderer2d {
         this.gl.clearColor(r, g, b, a);
         this.gl.clear(this.gl.COLOR_BUFFER_BIT);
     }
+    
     setTexture(texture: ITexture2d) {
         const state = this.renderState[this.renderState.length - 1];
         state.texture = texture;

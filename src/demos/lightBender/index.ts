@@ -4,9 +4,11 @@ import { levels, ILevelData } from './levels';
 
 // import assets
 import tileBasePng from './assets/tile-base.png';
+import nextLevelBtnPng from './assets/NextLevelBtn.png';
 
 import { Texture2D } from "../../engine/graphics/texture";
 import { Renderer2d } from "../../engine/graphics/renderer2d";
+import { MouseInput } from "../../engine/input/mouseInput";
 
 const lightColors: {[key: number]: Vec4} = {
     1: new Vec4(255/255, 255/255, 255/255, 1),  // white ff8a80
@@ -411,6 +413,8 @@ export class LightBender extends App {
     world: GameObject;
 
     elapsedTime: number = 0;
+
+    nextLevelBtn: Button;
     
     constructor(htmlCanvasId: string) {
         super(htmlCanvasId);
@@ -418,16 +422,9 @@ export class LightBender extends App {
         this.world = new GameObject(null);
         this.world.transform.setPos(this.canvas.width / 2, this.canvas.height / 2);
 
-        this.currentLevel = new Level(levels[this.currentLevelIndex]);
-        this.currentLevel.tileTextures = this.tileTextures;
-        this.currentLevel.setParent(this.world);
+        this.currentLevelIndex = 0;
+        this.loadLevelbyIndex(0);
 
-        this.loadLevel();
-
-        console.log(`hw: ${this.canvas.width / 2}`);
-        console.log(`hh: ${this.canvas.height / 2}`);
-        console.log(this.world.globalTransform.pos);
-        console.log(this.currentLevel.globalTransform.pos);
     }
 
     async loadAssets(): Promise<void> {
@@ -437,6 +434,28 @@ export class LightBender extends App {
         
         this.tileTextures[TILE_SHAPE.EMPTY] = new Texture2D(this.gl);
         this.tileTextures[TILE_SHAPE.EMPTY].load(tileBasePng);
+
+
+        const nextLevelBtnTexture = new Texture2D(this.gl);
+        await nextLevelBtnTexture.load(nextLevelBtnPng)
+
+        this.nextLevelBtn = new Button(this.gl, nextLevelBtnTexture);
+        this.nextLevelBtn.xPos = this.canvas.width - nextLevelBtnTexture.width - 10;
+        this.nextLevelBtn.yPos = 100;
+        this.nextLevelBtn.onClick = () => {
+            this.currentLevelIndex += 1;
+            this.loadLevelbyIndex(this.currentLevelIndex );
+        }
+    }
+
+    loadLevelbyIndex(index: number) {
+        this.currentLevel = new Level(levels[index]);
+        this.currentLevel.tileTextures = this.tileTextures;
+        this.currentLevel.setParent(this.world);
+
+        Tile.tileGeometries = [];
+
+        this.loadLevel();
     }
     
     update() {
@@ -465,6 +484,11 @@ export class LightBender extends App {
             if(t instanceof EmitterTile)
                 t.updateLights(this.time.deltaTime);
         }
+
+
+
+        // update the next level btn
+        this.nextLevelBtn.update(this.time.deltaTime, this.input.mouse);
     }
 
     draw() {
@@ -475,6 +499,10 @@ export class LightBender extends App {
         this.renderer2d.begin();
         this.drawBackgroundGrid();
         this.drawTiles();
+
+
+        this.nextLevelBtn.draw(this.renderer2d);
+
         this.renderer2d.end();
     }
 
@@ -654,5 +682,36 @@ export class LightBender extends App {
 
         return tile;
     }
+}
 
+class Button {
+
+    xPos: number;
+    yPos: number;
+    mouseOver: boolean = false;
+    onClick: () => void;
+
+    constructor(public gl: WebGL2RenderingContext, public texture: Texture2D) {
+
+    }
+
+    update(dt: number, mouseInput: MouseInput) {
+        const mx = mouseInput.pos.x;
+        const my = mouseInput.pos.y;
+        this.mouseOver = mx > this.xPos && mx < this.xPos + this.texture.width && 
+                         my > this.yPos && my < this.yPos + this.texture.height;
+
+        if(this.mouseOver && mouseInput.leftButtonDown && this.onClick)
+            this.onClick();
+    }
+
+    draw(renderer: Renderer2d) {
+        renderer.saveState(true);
+        renderer.setTexture(this.texture);
+
+        renderer.setColor(this.mouseOver ? new Vec4(1,1,1,0.8) : new Vec4(1,1,1,0.6));
+
+        renderer.darwRect(this.xPos, this.yPos, this.texture.width, this.texture.height, 0, 0, 0);
+        renderer.popState();
+    }
 }

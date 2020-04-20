@@ -6,22 +6,32 @@ import { RenderTexture } from './graphics/renderTexture';
 
 export class App
 {
+
+    static input: InputManager;
+
     canvas: HTMLCanvasElement;
-    input: InputManager;
+    
     time: FrameTimer;
     renderer2d: Renderer2d;
 
     gl: WebGL2RenderingContext;
 
+    get input(): InputManager {
+        return App.input
+    }
+
     constructor(htmlCanvasId: string) {
+
         this.canvas = document.getElementById(htmlCanvasId) as HTMLCanvasElement;
         this.resize();
-        this.input = new InputManager(this.canvas);
         this.time = new FrameTimer();
 
         this.gl = this.canvas.getContext("webgl2", {
             antialias: true
         });
+
+        if(App.input == null)
+            App.input = new InputManager(this.canvas);
 
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
@@ -35,8 +45,6 @@ export class App
     }
 
     destroy() {
-        this.input.destroy();
-        this.input = null;
     }
 
     async loadAssets() {

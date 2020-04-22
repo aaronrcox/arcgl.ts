@@ -15,9 +15,10 @@ export class App
     renderer2d: Renderer2d;
 
     gl: WebGL2RenderingContext;
+    private animationFrameToken = null;
 
     get input(): InputManager {
-        return App.input
+        return App.input;
     }
 
     constructor(htmlCanvasId: string) {
@@ -30,8 +31,7 @@ export class App
             antialias: true
         });
 
-        if(App.input == null)
-            App.input = new InputManager(this.canvas);
+        App.input = new InputManager(this.canvas);
 
         this.gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 
@@ -45,6 +45,8 @@ export class App
     }
 
     destroy() {
+        cancelAnimationFrame(this.animationFrameToken);
+        App.input.destroy();
     }
 
     async loadAssets() {
@@ -72,7 +74,7 @@ export class App
         this.input.keyboard.update();
         this.input.mouse.update();
         
-        requestAnimationFrame(() => {
+        this.animationFrameToken = requestAnimationFrame(() => {
              this.run();
         });
     }

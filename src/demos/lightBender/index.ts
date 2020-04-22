@@ -639,8 +639,6 @@ export class LightBender extends App {
                 let colorId = parseInt(map[yi][xi][colorIndex]);
                 const shapeId = parseInt(map[yi][xi][shapeIndex]);
 
-                console.log(lightId, dirId, colorId, shapeId);
-
                 const tile = this.createTile(level, xi, yi, lightId, shapeId, dirId, colorId);
                 if(tile) {
                     level.tiles.push(tile);

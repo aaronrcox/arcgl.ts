@@ -27,6 +27,22 @@
             height: 100%;
         }
 
+        .backdrop {
+            position: absolute;
+            width: 100vw;
+            height: 100vh;
+            left: 0;
+            top: 0;
+            background-color: rgba(255,0,0,0.0);
+            transition: all .15s ease-in-out;
+            pointer-events: none;
+        }
+
+        .backdrop.active {
+            background-color: rgba(255,0,0,0.05);
+            pointer-events: all;
+        }
+
         .page-nav {
             position: absolute;
             top: 0;
@@ -50,19 +66,24 @@
             padding: 0px;
             margin: 0px;
             margin-top:20px;
-            transition: all .5s ease-in-out;
             position: absolute;
             width: 300px;
             left: 0px;
             opacity: 0;
             pointer-events: none;
             background:rgba(0, 0, 0, 0.75);
+
+            transition: all .15s ease-in-out;
+            transform-origin: 0% 0%;
+            transform: scale(0, 0);
         }
 
         .page-nav ul.open {
             left: 20px;
             opacity: 1;
             pointer-events: all;
+
+            transform: scale(1, 1);
         }
 
         .page-nav ul li {
@@ -145,6 +166,7 @@
   <body>
         <canvas id="canvas" oncontextmenu="return false;"></canvas>
 
+        <div class="backdrop"></div>
         <nav class="page-nav">
             <div class="page-nav-title">
                 <div class="menu-btn">

@@ -13,8 +13,15 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/marked": "^0.7.4",
+    "@types/reflect-metadata": "^0.1.0",
     "gh-pages": "^2.2.0",
     "parcel": "^1.12.4",
+    "sass": "^1.26.5",
     "typescript": "^3.8.3"
+  },
+  "dependencies": {
+    "marked": "^1.0.0",
+    "reflect-metadata": "^0.1.13"
   }
 }

@@ -1,5 +1,7 @@
 
 import  'reflect-metadata';
+import './dark.scss';
+
 import marked = require('marked');
 
 interface IFormElementGroup {
@@ -98,7 +100,8 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
         Date: 'input',
         Number: 'input',
         Boolean: 'input',
-        Array: 'array'
+        Array: 'array',
+        Object: 'object'
     }
 
     const createInputField = (property: string, index: number, type: string, label: string, description: string): IFormElementGroup => {
@@ -242,6 +245,64 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
         return group;
     }
 
+    const createObjectField = (label: string, property: string, description: string = ''): IFormElementGroup => {
+        // create the label
+        const labelElem = document.createElement("label");
+        labelElem.textContent = label;
+        labelElem.htmlFor = property;
+
+        const ulElem = document.createElement('ul');
+
+        let index = 0;
+        for(let key in obj[property])
+        {
+            const li = document.createElement('li');
+
+            const elementType = obj[property][key].constructor.name;
+            const inputType = dataTypeInputTypeLookup[elementType];
+            if(inputType)
+            {
+                const input = document.createElement('input');
+                input.type = inputType;
+    
+                input.autocomplete = 'off';
+                input.id = `fb-input-${property}-${index}`;
+                input.addEventListener('input', (e) => {
+                    obj[property][key] = input.value;
+                    onFormChange();
+                })
+                input.value = obj[property][key];
+                li.appendChild(input);
+            }
+            else if( elementType === 'Function' )
+            {
+                const btn = document.createElement('button');
+                btn.innerText = key;
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    obj[property][key]();
+                });
+                li.appendChild(btn);
+            }
+            
+            ulElem.appendChild(li);
+
+            index += 1;
+        }
+
+        const descriptionElem = document.createElement('span');
+        descriptionElem.innerText = description;
+
+        const group: IFormElementGroup = {
+            property: property,
+            type: 'object',
+            label: labelElem,
+            arrayItems: ulElem,
+            description: descriptionElem
+        }
+        return group;
+    }
+
     const createFieldFactory = (data: IElementData): IFormElementGroup => {
 
         // Create the input
@@ -257,6 +318,8 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
                 return createButtonField(data.label, data.property);
             case 'array':
                 return createArrayField(data.label, data.property, data.description);
+            case 'object':
+                return createObjectField(data.label, data.property, data.description);
             default:
                 return null;
         }
@@ -333,6 +396,11 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
                 listItemElem.appendChild(item.button);
                 break;
             case 'array':
+                listItemElem.appendChild(item.label);
+                listItemElem.appendChild(item.arrayItems);
+                listItemElem.appendChild(item.description);
+                break;
+            case 'object':
                 listItemElem.appendChild(item.label);
                 listItemElem.appendChild(item.arrayItems);
                 listItemElem.appendChild(item.description);

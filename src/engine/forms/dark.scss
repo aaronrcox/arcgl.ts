@@ -1,0 +1,277 @@
+
+// $bg2: #1d2025;
+// $bg1: #1f2933;
+// $bg0: #323f4b;
+
+$bg2: #1b1b1b;
+$bg1: #363636;
+$bg0: #464646;
+
+$tc0: whitesmoke;
+$tc1: #efb44e;
+
+$groupSpacing: 20px;
+
+$rounded: 0px;
+
+.docs-container {
+
+    position: absolute;
+    width: 400px;
+    height: 100vh;
+    left: 0px;
+    top: 0px;
+    background: whitesmoke;
+    transition:  all 0.15s ease-in-out;
+    overflow-y: scroll;
+    box-sizing: border-box;
+
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.docs-container::-webkit-scrollbar {
+    display: none;
+}
+
+.docs-container.dark {
+    background: $bg0;
+
+    form {
+
+        padding: 20px;
+
+        >ul {
+            list-style: none;
+            padding: 0px;
+            margin: 0px;
+            color: whitesmoke;
+
+            input {
+                width: 100%;
+                padding: 9px;
+                background: transparent;
+                box-sizing: border-box;
+                border: 0px;
+                color: $tc0;
+                font-size: 14px;
+
+                &:focus {
+                    outline: none;
+                }
+            }
+
+            >li {
+                background: $bg1;
+                border: 1px solid $bg2;
+                border-radius: $rounded;
+                margin-bottom: $groupSpacing;
+                
+                &:hover {
+                    -webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                    -moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                    box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                }
+
+
+
+                >label {
+                    display: block;
+                    position: absolute;
+                    margin-top: -8px;
+                    margin-left: 5px;
+                    background: $bg1;
+                    padding: 5px;
+                    padding-top: 3px;
+                    padding-bottom: 0px;
+                    font-size: 10px;
+                    border-radius: $rounded - 2px;
+                }
+
+                >input {
+                    padding-bottom: 5px;
+                }
+
+                >span {
+                    background: $bg2;
+                    box-sizing: border-box;;
+                    display: block;
+                    width: 100%;
+                    padding: 3px;
+                    text-align: center;
+                    color: #C0C0C0;
+                    font-family: Arial, Helvetica, sans-serif;
+                    font-size: 11px;
+                    clear: both;
+                }
+
+                >span:empty {
+                    height: 1px;
+                    padding: 0px;
+                    margin: 0px;
+                }
+
+                // =================================
+                // TEXTBOX
+                // ================================
+
+                &.fb-element-text > label {
+
+                }
+                &.fb-element-text > input {
+                    
+                }
+
+                &.fb-element-text > span {
+                }
+
+                // =================================
+                // CHECKBOX
+                // ================================
+                
+
+                &.fb-element-checkbox > label {
+
+                    position: unset;
+                    display: unset;
+                    margin: 0px;
+                    margin-left: 2px;
+                    margin-top: 5px;
+                    font-size: 12px;
+                    float: left;
+                }
+
+                &.fb-element-checkbox > input {
+                    width: 16px;
+                    height: 24px;
+                    float: left;
+                    margin-left: 8px;
+                    
+                }
+
+                // =================================
+                // SELECT
+                // ================================
+                
+                &.fb-element-select > select {
+                    border: 0px;
+                    padding: 9px;
+                    padding-bottom: 5px;
+                    background: transparent;
+                    outline: none;
+                    color: $tc0;
+                    width: 100%;
+                    box-sizing: border-box;
+
+                    > option {
+                        background: $bg0;
+                    }
+                }
+
+
+                // =================================
+                // ARRAY - INPUTS
+                // ================================
+
+                &.fb-element-array > ul {
+                    list-style: none;
+                    padding: 0px;
+                    margin: 0px;
+
+                    >li {
+                        border-bottom: 1px solid $bg2;
+                    }
+                }
+
+                // =================================
+                // OBJECT - INPUTS
+                // ================================
+
+                &.fb-element-object > ul {
+                    list-style: none;
+                    padding: 0px;
+                    margin: 0px;
+                    color: $tc0;
+
+                    >li {
+                        border-bottom: 1px solid $bg2;
+                    }
+
+                    button {
+                        width: 100%;
+                        background: transparent;
+                        border: none;
+                        padding: 9px;
+                        color: $tc0;
+                        cursor: pointer;
+                    }
+
+                    button:hover {
+                        background: $bg2;
+                        color: $tc1;
+                    }
+                }
+
+                // =================================
+                // MARKDOWN
+                // ================================
+
+                &.fb-element-markdown {
+                    border: 0px;
+                    background: transparent;
+
+                    &:hover {
+                        box-shadow: none;
+                    }
+
+                    pre {
+                        background: $bg1;
+                        color: $tc0;
+                        padding: 10px;
+                    }
+
+                    hr {
+                        color: $tc0;
+                        background: $tc0;
+                    }
+                }
+
+                // =================================
+                // BUTTON
+                // ================================
+
+                &.fb-element-button {
+
+                    background: none;
+                    border: none;
+                    &:hover { box-shadow: none; }
+
+                    button {
+                        width: 100%;
+                        background: $bg2;
+                        outline: none;
+                        border: 1px solid $bg2;
+                        border-radius: 5px;;
+                        padding: 10px;
+                        color: $tc0;
+
+                        &:hover {
+                            color: $tc1;
+                            cursor: pointer;
+                            -webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                            -moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                            box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                        }
+                    }
+
+                }
+                                
+            }
+
+            
+
+            
+
+        }
+
+    }
+}

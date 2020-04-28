@@ -42,6 +42,7 @@ window.onload = (() => {
 // ============================================================================
 {
     const menuBtn = document.querySelector('.menu-btn');
+    const pageNav = document.querySelector('.page-nav');
     const menuList = document.querySelector('.page-nav ul');
     const menuBackdrop = document.querySelector('.backdrop');
 
@@ -60,7 +61,9 @@ window.onload = (() => {
         menuOpen = visible;
         if(menuOpen){ 
             docsElem.classList.add('open');
-            canvasElem.classList.add('push-right');
+            canvasElem.classList.add('push-right-200');
+            canvasElem.classList.add('push-left-200');
+            pageNav.classList.add('push-right-400');
 
             menuBtn.classList.add('open')
             // menuList.classList.add('open');
@@ -68,7 +71,9 @@ window.onload = (() => {
         }
         else {
             docsElem.classList.remove('open');
-            canvasElem.classList.remove('push-right');
+            canvasElem.classList.remove('push-right-200');
+            canvasElem.classList.remove('push-left-200');
+            pageNav.classList.remove('push-right-400');
 
             menuBtn.classList.remove('open');
             // menuList.classList.remove('open');
@@ -97,52 +102,82 @@ class TestForm {
     name: string = "hello world";
 
     @editable()
+    @displayName('Do you smoke')
+    @description("The quick brown fox")
+    smokes: boolean = true;
+
+    @editable()
     @displayName('Family') 
     @description("The quick brown fox")
     family: string[] = ['mum', 'dad', 'joel'];
 
-    // @editable()
-    // @displayName('Age')
-    // @description("the quick brown fox")
-    // age: number = 18;
+    @editable()
+    @description("The quick brown fox")
+    booleans: number[] = [10, 20, 30];
 
-    // @editable()
-    // @displayName('Do you smoke')
-    // @description("the quick brown fox")
-    // smokes: boolean = true;
-
-    // @editable()
-    // @description("the quick brown fox")
-    // dob: Date = new Date();
-
-    // @editable()
-    // @selectEnumOptions(EItemTest)
-    // @description("the quick brown fox")
-    // options: EItemTest = EItemTest.OPTION_ONE;
+    @editable()
+    @displayName('Age')
+    @description("the quick brown fox")
+    age: number = 18;
 
 
-    // @editable()
-    // @markdown()
-    // @description("the quick brown fox")
-    // info: string = `
-    // # Hello world
+    @editable()
+    @description("the quick brown fox")
+    dob: Date = new Date();
 
-    //     #include <iostream>
-    //     int main(int argc, char **argv)
-    //     {
-    //         std::cout << "hello world" << std::endl;
-    //         return 0;
-    //     }
-    // `;
+    @editable()
+    @selectEnumOptions(EItemTest)
+    @description("the quick brown fox")
+    options: EItemTest = EItemTest.OPTION_ONE;
+
+
+    @editable()
+    @markdown()
+    @description("the quick brown fox")
+    info: string = `
+    # Hello world
+
+    A Simple C++ example hello world program
+
+        #include <iostream>
+        int main(int argc, char **argv)
+        {
+            std::cout << "hello world" << std::endl;
+            return 0;
+        }
+    `;
 
     @editable()
     @description("Close")
+    @displayName('CLOSE')
     close() {
         const docsElem = document.querySelector('.docs-container');
         const canvasElem = document.querySelector('#canvas');
         docsElem.classList.remove('open');
         canvasElem.classList.remove('push-right');
         console.log(docsElem);
+        alert('hello');
+    }
+
+    @editable()
+    @displayName(' ')
+    buttons: { [key:string]: ()=>void } = {
+        one: () => {
+            console.log('hello')
+        },
+        two: () => {
+            console.log('world')
+        },
+        three: () => {
+            console.log('world')
+        }
+    }
+
+    @editable()
+    @displayName(' ')
+    people: { [key:string]: string } = {
+        one: 'aaron',
+        two: 'joel'
     }
 }
 

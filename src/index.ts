@@ -2,7 +2,7 @@
 import RunDemo from './demos';
 import { App } from './engine/app';
 
-import { generateForm, editable, displayName, description, selectEnumOptions, markdown, PropElementType } from './engine/forms';
+import { generateForm, editable, PropElementType } from './engine/forms';
 
 // ============================================================================
 // Launch the canvas demo
@@ -85,6 +85,20 @@ window.onload = (() => {
         OPTION_THREE
     }
 
+    class Vec3
+    {
+        x: number = 0;
+        y: number = 0;
+        z: number = 0;
+    }
+
+    interface IVec3
+    {
+        x: number;
+        y: number;
+        z: number;
+    }
+
     class TestForm {
 
         @editable({
@@ -122,8 +136,26 @@ window.onload = (() => {
             }
         }
 
-        @editable()
-        firstName: string = 'Aaron'
+        // @editable()
+        // firstName: string = 'Aaron';
+
+        // @editable()
+        // pos: Vec3 = new Vec3();
+
+        // @editable()
+        // dir: IVec3 = {x: 0, y: 0, z: 0};
+
+        // @editable({
+        //     items_per_row: 3
+        // })
+        // vel: IVec3 = {x: 0, y: 0, z: 0};
+
+        // @editable({
+        //     description: 'transformation matrix',
+        //     items_per_row: 4
+        // })
+        // mat: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
+
     }
 
     const docsContainerElem = document.querySelector('.docs') as HTMLElement;

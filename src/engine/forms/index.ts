@@ -23,6 +23,9 @@ interface IPropOptions
     dropdown_options?: any[];
     type?: PropElementType;
     inputType?: string;
+
+    items_per_row?: number;
+
     onChange?: (oldValue: any, newValue: any)=>void;
 }
 
@@ -89,6 +92,7 @@ export function editable(options: IPropOptions = {}): PropertyDecorator {
         options.inputType = dataTypeInputTypeLookup[dataType];
         options.label = options.label !== undefined ? options.label : splitToWords(propertyKey);
         options.description = options.description || '';
+        options.items_per_row = options.items_per_row || 1;
 
         const properties: IPropData[] = Reflect.getMetadata("editableProperties", parent) || [];
         if (properties.indexOf(propertyKey) < 0) {
@@ -125,7 +129,7 @@ function addPropChangeEvent(obj: any, property: string, callback: Function) {
     obj[`__on_change_${property}`].push(callback);
 }
 
-const createInputField = (property: IPropData, obj: any, onFormChange: any) => {
+const createInputField = (property: IPropData, obj: any, onFormChange: any): HTMLElement => {
         
     // create the label
     const labelElem = document.createElement("label");
@@ -168,7 +172,7 @@ const createInputField = (property: IPropData, obj: any, onFormChange: any) => {
     return listItemElem;
 }
 
-const createSelectField = (property: IPropData, obj: any, onFormChange: any) =>
+const createSelectField = (property: IPropData, obj: any, onFormChange: any): HTMLElement =>
 {
     // create the label
     const labelElem = document.createElement("label");
@@ -215,7 +219,7 @@ const createSelectField = (property: IPropData, obj: any, onFormChange: any) =>
     return listItemElem;
 }
 
-const createMarkdownField = (property: IPropData, obj: any, onFormChange: any) => {
+const createMarkdownField = (property: IPropData, obj: any, onFormChange: any): HTMLElement => {
 
     // create the markdown element
     const markdownElement = document.createElement('div');
@@ -235,7 +239,7 @@ const createMarkdownField = (property: IPropData, obj: any, onFormChange: any) =
     return listItemElem;
 }
 
-const createButtonField = (property: IPropData, obj: any, onFormChange: any) => {
+const createButtonField = (property: IPropData, obj: any, onFormChange: any): HTMLElement => {
 
     // create a button element
     const btn = document.createElement('button');
@@ -256,7 +260,7 @@ const createButtonField = (property: IPropData, obj: any, onFormChange: any) => 
     
 }
 
-const createArrayField = (property: IPropData, obj: any, onFormChange: any) => {
+const createArrayField = (property: IPropData, obj: any, onFormChange: any): HTMLElement => {
 
     // create the label
     const labelElem = document.createElement("label");
@@ -271,16 +275,23 @@ const createArrayField = (property: IPropData, obj: any, onFormChange: any) => {
     const ulElem = document.createElement('ul');
 
     const buildItemList = (element: any, index: number) => {
+
+        if(index % property.options.items_per_row === 0) {
+            const breakLi = document.createElement('li');
+            breakLi.classList.add('break');
+            ulElem.appendChild(breakLi);
+        }
+
         const li = document.createElement('li');
-        const input = document.createElement('input');
+        const input = document.createElement('input') as any;
         input.type = dataTypeInputTypeLookup[obj[property.key][index].constructor.name];
         input.autocomplete = 'off';
         input.id = `fb-input-${property}-${index}`;
-        input.addEventListener('input', (e) => {
-            obj[property.key][index] = input.value;
+        input.addEventListener('input', (e: any) => {
+            obj[property.key][index] = input[inputTypeValueLookup[input.type]];
             onFormChange();
         })
-        input.value = obj[property.key][index];;
+        input[inputTypeValueLookup[input.type]] = obj[property.key][index];;
         li.appendChild(input);
         ulElem.appendChild(li);
     };
@@ -306,7 +317,7 @@ const createArrayField = (property: IPropData, obj: any, onFormChange: any) => {
     return listItemElem;
 }
 
-const createObjectField = (property: IPropData, obj: any, onFormChange: any) => {
+const createObjectField = (property: IPropData, obj: any, onFormChange: any): HTMLElement => {
     // create the label
     const labelElem = document.createElement("label");
     labelElem.textContent = property.options.label;
@@ -320,6 +331,13 @@ const createObjectField = (property: IPropData, obj: any, onFormChange: any) => 
     const ulElem = document.createElement('ul');
 
     const buidElementFn = (key: string, index: number) => {
+
+
+        if(index % property.options.items_per_row === 0) {
+            const breakLi = document.createElement('li');
+            breakLi.classList.add('break');
+            ulElem.appendChild(breakLi);
+        }
 
         const li = document.createElement('li');
 
@@ -380,6 +398,14 @@ const createObjectField = (property: IPropData, obj: any, onFormChange: any) => 
     return listItemElem;
 }
 
+const fieldRenderFunc: {[key: string]: (property: IPropData, obj: any, onFormChange: any) => HTMLElement } = {
+    INPUT: createInputField,
+    DROPDOWN: createSelectField,
+    MARKDOWN: createMarkdownField,
+    BUTTON: createButtonField,
+    ARRAY: createArrayField,
+    OBJECT: createObjectField
+}
 
 export function generateForm(parentElement: HTMLElement, obj: any, onFormChange: ()=>void = ()=>{} ) {
     
@@ -390,43 +416,18 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
     const formList = document.createElement('ul');
     form.appendChild(formList);
 
-    const createFieldFactory = (property: IPropData) => {
-
-        let elem = null;
-        // Create the input
-        switch (property.options.type) {
-            case PropElementType.INPUT:
-                elem = createInputField(property, obj, onFormChange);
-                break;
-            case PropElementType.DROPDOWN:
-                elem = createSelectField(property, obj, onFormChange);
-                break;
-            case PropElementType.MARKDOWN: 
-                elem = createMarkdownField(property, obj, onFormChange);
-                break;
-            case PropElementType.BUTTON: 
-                elem = createButtonField(property, obj, onFormChange);
-                break;
-            case PropElementType.ARRAY:
-                elem = createArrayField(property, obj, onFormChange);
-                break;
-            case PropElementType.OBJECT:
-                elem = createObjectField(property, obj, onFormChange);
-                break;
-            default:
-                break;
-        }
-
-        if (elem !== null) {
-            formList.appendChild(elem);
-        }
-    }
-
     const properties: IPropData[] = Reflect.getMetadata("editableProperties", obj) || [];
 
     // create the input elements
     for (let property of properties) {
-        createFieldFactory(property);
+
+        // get the render function from our lookup
+        const createFieldFn = fieldRenderFunc[PropElementType[property.options.type]] || fieldRenderFunc['OBJECT'];
+        if( createFieldFn ) {
+            // create the markup and append
+            const elem = createFieldFn(property, obj, onFormChange);
+            formList.appendChild(elem);
+        }
     }
 }
 

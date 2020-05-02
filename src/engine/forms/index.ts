@@ -66,12 +66,16 @@ const dataTypeElementTypeLookup: {[key: string]: PropElementType} = {
 
 export function editable(options: IPropOptions = {}): PropertyDecorator {
 
+    // If we specify dropdown_enum_options
+    // than we are automaticly assuming this is a dropdown menu
     if(options.dropdown_enum_options) {
         options.dropdown_options = Object.keys(options.dropdown_enum_options)
         .filter(key => isNaN(Number(key)))
         .map((z: string) => ({name: z, value: (options.dropdown_enum_options as any)[z] }));
     }
 
+    // if we have specified dropdown options
+    // than change the PropElementType to dropdown
     if(!options.type && options.dropdown_options) {
         options.type = PropElementType.DROPDOWN;
     }
@@ -80,6 +84,7 @@ export function editable(options: IPropOptions = {}): PropertyDecorator {
 
         const dataType = Reflect.getMetadata("design:type", parent, propertyKey).name;
 
+        // set default values on the passed in options
         options.type = options.type || dataTypeElementTypeLookup[dataType];
         options.inputType = dataTypeInputTypeLookup[dataType];
         options.label = options.label !== undefined ? options.label : splitToWords(propertyKey);
@@ -102,9 +107,7 @@ function createChangeProps(this: any, parent: Object, propertyKey: any) {
         const oldValue = this[key];
         this[key] = value;
 
-        this['__editable__'] = this['__editable__'] || {};
-        
-        for(const fn of this['__editable__'][`__on_change_${propertyKey}`] || []) {
+        for(const fn of this[`__on_change_${propertyKey}`] || []) {
             fn(oldValue, value);
         }
     }
@@ -118,9 +121,8 @@ function createChangeProps(this: any, parent: Object, propertyKey: any) {
 }
 
 function addPropChangeEvent(obj: any, property: string, callback: Function) {
-    obj['__editable__'] = obj['__editable__'] || {};
-    obj['__editable__'][`__on_change_${property}`] = obj['__editable__'][`__on_change_${property}`] || [];
-    obj['__editable__'][`__on_change_${property}`].push(callback);
+    obj[`__on_change_${property}`] = obj[`__on_change_${property}`] || [];
+    obj[`__on_change_${property}`].push(callback);
 }
 
 const createInputField = (property: IPropData, obj: any, onFormChange: any) => {
@@ -428,6 +430,10 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
     }
 }
 
+// looks at the number of spaces on the first line
+// and strips them from every other line
+// this allows us to have multiline strings that are nicelly indented
+// in our code.
 function escape(str: string) {
     const lines = str.split('\n');
     if(lines.length === 1)
@@ -440,6 +446,8 @@ function escape(str: string) {
     return lines.join('\n');
 }
 
+// Converts a str from 'pascalCase' to seperate words
+// eg: 'firstName' to 'First name'
 function splitToWords(str: string): string {
     
     let newStr = str[0].toUpperCase();

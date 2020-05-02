@@ -174,8 +174,8 @@ canvas {
 }
 
 .push-left-200 {
-    /* right:200px !important; */
-    /* transform: translateX(-200px); */
+    right:200px !important;
+    transform: translateX(-200px);
     
 }
 
@@ -183,7 +183,7 @@ canvas {
     left:-400px !important;
 }
 
-/* 
+
 
 .docs-container {
     position: absolute;
@@ -193,7 +193,7 @@ canvas {
     top: 0px;
     left: 0px;
     background-color: whitesmoke;
-    padding: 20px;
+    /* padding: 20px; */
     box-sizing: border-box;
     font-family: Arial, Helvetica, sans-serif;
 
@@ -213,7 +213,7 @@ canvas {
     transform: scaleX(1);
 }
 
-
+/* 
 
 
 

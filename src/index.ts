@@ -2,7 +2,7 @@
 import RunDemo from './demos';
 import { App } from './engine/app';
 
-import { generateForm, editable, displayName, description, selectEnumOptions, markdown, FormElementType } from './engine/forms';
+import { generateForm, editable, displayName, description, selectEnumOptions, markdown, PropElementType } from './engine/forms';
 
 // ============================================================================
 // Launch the canvas demo
@@ -35,15 +35,12 @@ window.onload = (() => {
 });
 
 
-
-
 // ============================================================================
 // APP MENU
 // ============================================================================
 {
     const menuBtn = document.querySelector('.menu-btn');
     const pageNav = document.querySelector('.page-nav');
-    const menuList = document.querySelector('.page-nav ul');
     const menuBackdrop = document.querySelector('.backdrop');
 
     const docsElem = document.querySelector('.docs-container');
@@ -62,129 +59,81 @@ window.onload = (() => {
         if(menuOpen){ 
             docsElem.classList.add('open');
             canvasElem.classList.add('push-right-200');
-            canvasElem.classList.add('push-left-200');
             pageNav.classList.add('push-right-400');
 
             menuBtn.classList.add('open')
-            // menuList.classList.add('open');
             menuBackdrop.classList.add('active');
         }
         else {
             docsElem.classList.remove('open');
             canvasElem.classList.remove('push-right-200');
-            canvasElem.classList.remove('push-left-200');
             pageNav.classList.remove('push-right-400');
 
             menuBtn.classList.remove('open');
-            // menuList.classList.remove('open');
             menuBackdrop.classList.remove('active');
         }
     }
-
-}
 
 // ============================================================================
 // TEST FORMS GENERATION
 // ============================================================================
 
-enum EItemTest
-{
-    OPTION_ONE,
-    OPTION_TWO,
-    OPTION_THREE
-}
+    enum EItemTest
+    {
+        OPTION_ONE,
+        OPTION_TWO,
+        OPTION_THREE
+    }
 
-class TestForm {
-    
-    @editable({
-        label: 'Name',
-        description: 'The quick brown fox'
-    })
-    name: string = "hello world";
+    class TestForm {
 
-    @editable({
-        label: 'Do you smoke',
-        description: 'The quick brown fox'
-    })
-    smokes: boolean = true;
+        @editable({
+            type: PropElementType.MARKDOWN
+        })
+        info: string = `
+        # Hello world
 
-    @editable({
-        label: 'Family',
-        description: 'The quick brown fox'
-    })
-    family: string[] = ['mum', 'dad', 'joel'];
+        A Simple C++ example hello world program
 
-    @editable({
-        label: 'Numbers',
-        description: 'The quick brown fox'
-    })
-    numbers: number[] = [10, 20, 30];
+            #include <iostream>
+            int main(int argc, char **argv)
+            {
+                std::cout << "hello world" << std::endl;
+                return 0;
+            }
+        `;
 
-    @editable({
-        label: null
-    })
-    age: number = 18;
-
-    @editable()
-    dob: Date = new Date();
-
-    @editable({ dropdown_enum_options: EItemTest})
-    options: number = EItemTest.OPTION_ONE;
-
-    @editable({
-        type: FormElementType.MARKDOWN
-    })
-    info: string = `
-    # Hello world
-
-    A Simple C++ example hello world program
-
-        #include <iostream>
-        int main(int argc, char **argv)
-        {
-            std::cout << "hello world" << std::endl;
-            return 0;
+        @editable({
+            label: '',
+            description: 'Demos'
+        })
+        buttons: { [key:string]: ()=>void } = {
+            RayCast: () => {
+                window.location.hash = 'RayCastingDemo';
+                hamburgerMenu(false);
+            },
+            RenderToTexture: () => {
+                window.location.hash = 'RenderTextureDemo';
+                hamburgerMenu(false);
+            },
+            LightBender: () => {
+                window.location.hash = 'LightBender';
+                hamburgerMenu(false);
+            }
         }
-    `;
 
-    @editable()
-    close() {
-        alert('hello');
+        @editable()
+        firstName: string = 'Aaron'
     }
 
-    @editable()
-    buttons: { [key:string]: ()=>void } = {
-        one: () => {
-            console.log('hello')
-        },
-        two: () => {
-            console.log('world')
-        },
-        three: () => {
-            console.log('world')
-        }
-    }
+    const docsContainerElem = document.querySelector('.docs') as HTMLElement;
+    const testFormInstance = new TestForm();
 
-    @editable({
-        label: ''
-    })
-    people: { [key:string]: string } = {
-        one: 'aaron',
-        two: 'joel'
-    }
+    console.log(testFormInstance);
+
+    generateForm(docsContainerElem, testFormInstance, () => {
+        console.log(testFormInstance);
+    });
+
+
 }
-
-const docsElem = document.querySelector('.docs') as HTMLElement;
-const testFormInstance = new TestForm();
-
-generateForm(docsElem, testFormInstance, () =>{
-    testFormInstance.name += '_a';
-});
-
-console.log(testFormInstance);
-
-setInterval(() => {
-    testFormInstance.age += 1;
-    // testFormInstance.numbers.push(10);
-    testFormInstance.people = {...testFormInstance.people, one: testFormInstance.age.toString()};
-}, 5000);

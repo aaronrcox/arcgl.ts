@@ -152,6 +152,10 @@ $rounded: 0px;
                     
                 }
 
+                &.fb-element-checkbox > span:before {
+                    content: '';
+                }
+
                 // =================================
                 // SELECT
                 // ================================
@@ -217,6 +221,7 @@ $rounded: 0px;
                         border: none;
                         padding: 9px;
                         color: $tc0;
+                        text-align: left;
                         cursor: pointer;
                     }
 

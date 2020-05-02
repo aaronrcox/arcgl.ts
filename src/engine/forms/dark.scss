@@ -198,6 +198,17 @@ $rounded: 0px;
 
                     >li {
                         border-bottom: 1px solid $bg2;
+
+                        input {
+                            padding-top: 2px;
+                        }
+
+                        label {
+                            color: $tc1;
+                            font-size: x-small;
+                            margin-left: 10px;
+                        }
+
                     }
 
                     button {

@@ -165,7 +165,9 @@ class TestForm {
         }
     }
 
-    @editable()
+    @editable({
+        label: ''
+    })
     people: { [key:string]: string } = {
         one: 'aaron',
         two: 'joel'
@@ -179,7 +181,10 @@ generateForm(docsElem, testFormInstance, () =>{
     testFormInstance.name += '_a';
 });
 
+console.log(testFormInstance);
+
 setInterval(() => {
     testFormInstance.age += 1;
+    // testFormInstance.numbers.push(10);
     testFormInstance.people = {...testFormInstance.people, one: testFormInstance.age.toString()};
-}, 1000)
+}, 5000);

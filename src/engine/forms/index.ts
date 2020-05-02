@@ -298,6 +298,9 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
             const inputType = dataTypeInputTypeLookup[elementType];
             if(inputType)
             {
+                const name = document.createElement('label');
+                name.innerHTML = key;
+
                 const input = document.createElement('input');
                 input.type = inputType;
     
@@ -308,6 +311,8 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
                     onFormChange();
                 })
                 input.value = obj[property][key];
+
+                li.appendChild(name);
                 li.appendChild(input);
             }
             else if( elementType === 'Function' )

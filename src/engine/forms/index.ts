@@ -4,81 +4,104 @@ import './dark.scss';
 
 import marked = require('marked');
 
-interface IFormElementGroup {
-    property: string;
-    type: string;
-
-    input?: HTMLInputElement;
-    select?: HTMLSelectElement;
-    label?: HTMLElement;
-    description?: HTMLElement;
-    markdown?: HTMLElement;
-    arrayItems?: HTMLElement;
-    button?: HTMLButtonElement;
-}
-
 interface IElementData
 {
     property: string;
     arrIndex: number;
     dataType: string;
-    inputType: string;
+    inputType: FormElementType;
     label: string;
     description: string;
     options: any[];
 }
 
-export function editable(): PropertyDecorator {
-    return function (target: Object, propertyKey: any) {
-        const properties: string[] = Reflect.getMetadata("editableProperties", target) || [];
-        if (properties.indexOf(propertyKey) < 0) {
-            properties.push(propertyKey);
+export enum FormElementType
+{
+    INPUT,
+    DROPDOWN,
+    BUTTON,
+    OBJECT,
+    ARRAY,
+    MARKDOWN
+}
+
+interface IFormOptions
+{
+    label?: string;
+    tooltip?: string;
+    description?: string;
+    dropdown_enum_options?: {[key: string]: string | number};
+    dropdown_options?: any[];
+    type?: FormElementType;
+    onChange?: (oldValue: any, newValue: any)=>void;
+}
+
+interface IFormData 
+{
+    parent: Object;
+    propertyKey: any;
+    options: IFormOptions;
+}
+
+function createChangeProps(this: any, parent: Object, propertyKey: any) {
+    const key = `__${propertyKey}__`;
+    const getter = function(this: any) { return this[key];  }
+    const setter = function(this: any, value: any) {
+        const oldValue = this[key];
+        this[key] = value;
+        
+        for(const fn of this[`__on_change_${propertyKey}`] || []){
+            fn(oldValue, value);
         }
-        Reflect.defineMetadata("editableProperties", properties, target);
+    }
+
+    Object.defineProperty(parent, propertyKey, {
+        get: getter,
+        set: setter,
+        enumerable: true,
+        configurable: true
+    });
+}
+
+function addPropChangeEvent(obj: any, property: string, callback: Function) {
+    obj[`__on_change_${property}`] = obj[`__on_change_${property}`] || [];
+    obj[`__on_change_${property}`].push(callback);
+}
+
+export function editable(options: IFormOptions = {}): PropertyDecorator {
+
+    if(options.dropdown_enum_options) {
+        options.dropdown_options = Object.keys(options.dropdown_enum_options)
+        .filter(key => isNaN(Number(key)))
+        .map((z: string) => ({name: z, value: (options.dropdown_enum_options as any)[z] }));
+    }
+
+    if(!options.type && options.dropdown_options) {
+        options.type = FormElementType.DROPDOWN;
+    }
+
+    return function (parent: Object, propertyKey: any) {
+        const properties: IFormData[] = Reflect.getMetadata("editableProperties", parent) || [];
+        if (properties.indexOf(propertyKey) < 0) {
+            createChangeProps(parent, propertyKey);
+            properties.push({ parent, propertyKey, options });
+        }
+        Reflect.defineMetadata("editableProperties", properties, parent);
     }
 }
 
-export function selectEnumOptions(options: {[key: string]: string | number}): PropertyDecorator {
-    return function (target: Object, propertyKey: any) {
-        const type_overrides: any = Reflect.getMetadata("type_overrides", target) || {};
-        const select_options: any = Reflect.getMetadata("select_options", target) || {};
 
-        type_overrides[propertyKey] = 'select';
-        select_options[propertyKey] = Object.keys(options)
-            .filter(key => isNaN(Number(key)))
-            .map((z: string) => ({name: z, value: (options as any)[z] }));
 
-        Reflect.defineMetadata("type_overrides", type_overrides, target);
-        Reflect.defineMetadata("select_options", select_options, target);
-    }
-}
 
-export function markdown() {
-    return function (target: Object, propertyKey: any) {
-        const type_overrides: any = Reflect.getMetadata("type_overrides", target) || {};
-        type_overrides[propertyKey] = 'markdown';
-        Reflect.defineMetadata("type_overrides", type_overrides, target);
-    }
-}
-
-export function displayName(name: string): PropertyDecorator  {
-    return function (target: Object, propertyKey: any) {
-        const displayNames: any = Reflect.getMetadata("displayName", target) || {};
-        displayNames[propertyKey] = name;
-        Reflect.defineMetadata("displayName", displayNames, target);
-    }
-}
-
-export function description(description: string): PropertyDecorator  {
-    return function (target: any, propertyKey: any) {
-        const descriptions: any = Reflect.getMetadata("descriptions", target) || {};
-        descriptions[propertyKey] = description;
-        Reflect.defineMetadata("descriptions", descriptions, target);
-    }
-}
 
 export function generateForm(parentElement: HTMLElement, obj: any, onFormChange: ()=>void = ()=>{} ) {
     
+    const form = document.createElement("form");
+    parentElement.innerHTML = '';
+    parentElement.appendChild(form);
+
+    const formList = document.createElement('ul');
+    form.appendChild(formList);
 
     const inputTypeValueLookup: {[key: string]: string} = {
         text: 'value',
@@ -94,18 +117,17 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
         Boolean: 'checkbox',
     }
 
-    const dataTypeElementTypeLookup: {[key: string]: string} = {
-        Function: 'button',
-        String: 'input',
-        Date: 'input',
-        Number: 'input',
-        Boolean: 'input',
-        Array: 'array',
-        Object: 'object'
+    const dataTypeElementTypeLookup: {[key: string]: FormElementType} = {
+        Function: FormElementType.BUTTON,
+        String:FormElementType.INPUT,
+        Date: FormElementType.INPUT,
+        Number: FormElementType.INPUT,
+        Boolean: FormElementType.INPUT,
+        Array: FormElementType.ARRAY,
+        Object: FormElementType.OBJECT
     }
 
-    const createInputField = (property: string, index: number, type: string, label: string, description: string): IFormElementGroup => {
-
+    const createInputField = (property: string, index: number, type: string, label: string, description: string) => {
         
         // create the label
         const labelElem = document.createElement("label");
@@ -118,28 +140,29 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
         inputElem.autocomplete = "off";
 
         inputElem[inputTypeValueLookup[type]] = (index ? obj[property][index] : obj[property])
-
         inputElem.addEventListener('input', () => {
             if(index) obj[property][index] = inputElem[inputTypeValueLookup[type]];
             else obj[property] = inputElem[inputTypeValueLookup[type]];
             onFormChange();
         });
-
         const descriptionElem = document.createElement('span');
-        descriptionElem.innerText = description || '';
+        descriptionElem.innerHTML = description || '';
 
-        const group: IFormElementGroup = {
-            property: property,
-            type: type,
-            label: labelElem,
-            input: inputElem,
-            description: descriptionElem,
-        };
+        addPropChangeEvent(obj, property, (oldValue: any, newValue: any) => {
+            inputElem[inputTypeValueLookup[type]] = newValue;
+        });
 
-        return group;
+        // create the list item
+        const listItemElem = document.createElement('li');
+        listItemElem.classList.add(`fb-element-input`);
+        formList.appendChild(listItemElem);
+
+        listItemElem.appendChild(labelElem);
+        listItemElem.appendChild(inputElem);
+        listItemElem.appendChild(descriptionElem);
     }
 
-    const createSelectField = (options: any[], label: string, property: string, description: string = ''): IFormElementGroup =>
+    const createSelectField = (options: any[], label: string, property: string, description: string = '') =>
     {
         // create the label
         const labelElem = document.createElement("label");
@@ -155,60 +178,67 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
             onFormChange();
         });
 
+        addPropChangeEvent(obj, property, (oldValue: any, newValue: any) => {
+            inputElem.value = newValue;
+        });
+
         for(const opt of options)
         {
             const optionElem = document.createElement('option');
             optionElem.value = opt.value;
-            optionElem.innerText = opt.name;
+            optionElem.innerHTML = opt.name;
             inputElem.appendChild(optionElem);
-
         }
 
         const descriptionElem = document.createElement('span');
-        descriptionElem.innerText = description;
+        descriptionElem.innerHTML = description;
 
-        const group: IFormElementGroup = {
-            property: property,
-            type: 'select',
-            label: labelElem,
-            select: inputElem,
-            description: descriptionElem,
-        }
+        // create the list item
+        const listItemElem = document.createElement('li');
+        listItemElem.classList.add(`fb-element-select`);
+        formList.appendChild(listItemElem);
 
-        return group;
+        listItemElem.appendChild(labelElem);
+        listItemElem.appendChild(inputElem);
+        listItemElem.appendChild(descriptionElem);
     }
 
-    const createMarkdownField = (property: string): IFormElementGroup => {
+    const createMarkdownField = (property: string) => {
 
         const markdownElement = document.createElement('div');
         markdownElement.classList.add('markdown');
-        markdownElement.innerHTML = marked( escape(obj[property]) )
-        const group: IFormElementGroup = {
-            property: property,
-            type: 'markdown',
-            markdown: markdownElement,
-        }
-        return group;
+        markdownElement.innerHTML = marked( escape(obj[property]) );
+
+        addPropChangeEvent(obj, property, (oldValue: any, newValue: any) => {
+            markdownElement.innerHTML = marked( escape(newValue) )
+        });
+
+        // create the list item
+        const listItemElem = document.createElement('li');
+        listItemElem.classList.add(`fb-element-markdown`);
+        formList.appendChild(listItemElem);
+
+        listItemElem.appendChild(markdownElement);
     }
 
-    const createButtonField = (label: string, property: string): IFormElementGroup => {
+    const createButtonField = (label: string, property: string) => {
         const btn = document.createElement('button');
-        btn.innerText = label;
+        btn.innerHTML = label;
         btn.addEventListener('click', (e) => {
             e.preventDefault();
             obj[property]();
         });
 
-        const group: IFormElementGroup = {
-            property: property,
-            type: 'button',
-            button: btn
-        }
+        // create the list item
+        const listItemElem = document.createElement('li');
+        listItemElem.classList.add(`fb-element-button`);
+        formList.appendChild(listItemElem);
 
-        return group;
+        listItemElem.appendChild(btn);
+        
     }
 
-    const createArrayField = (label: string, property: string, description: string = ''): IFormElementGroup => {
+    const createArrayField = (label: string, property: string, description: string = '') => {
 
         // create the label
         const labelElem = document.createElement("label");
@@ -217,7 +247,7 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
 
         const ulElem = document.createElement('ul');
 
-        obj[property].forEach((element: any, index: number) => {
+        const buildItemList = (element: any, index: number) => {
             const li = document.createElement('li');
             const input = document.createElement('input');
             input.type = dataTypeInputTypeLookup[obj[property][index].constructor.name];
@@ -230,22 +260,29 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
             input.value = obj[property][index];;
             li.appendChild(input);
             ulElem.appendChild(li);
+        };
+
+        obj[property].forEach(buildItemList);
+
+        addPropChangeEvent(obj, property, (oldVal: any, newVal: any) => {
+            ulElem.innerHTML = '';
+            obj[property].forEach(buildItemList);
         });
 
         const descriptionElem = document.createElement('span');
-        descriptionElem.innerText = description;
+        descriptionElem.innerHTML = description;
 
-        const group: IFormElementGroup = {
-            property: property,
-            type: 'array',
-            label: labelElem,
-            arrayItems: ulElem,
-            description: descriptionElem
-        }
-        return group;
+        // create the list item
+        const listItemElem = document.createElement('li');
+        listItemElem.classList.add(`fb-element-array`);
+        formList.appendChild(listItemElem);
+
+        listItemElem.appendChild(labelElem);
+        listItemElem.appendChild(ulElem);
+        listItemElem.appendChild(descriptionElem);
     }
 
-    const createObjectField = (label: string, property: string, description: string = ''): IFormElementGroup => {
+    const createObjectField = (label: string, property: string, description: string = '') => {
         // create the label
         const labelElem = document.createElement("label");
         labelElem.textContent = label;
@@ -253,9 +290,8 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
 
         const ulElem = document.createElement('ul');
 
-        let index = 0;
-        for(let key in obj[property])
-        {
+        const buidElementFn = (key: string, index: number) => {
+
             const li = document.createElement('li');
 
             const elementType = obj[property][key].constructor.name;
@@ -277,7 +313,7 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
             else if( elementType === 'Function' )
             {
                 const btn = document.createElement('button');
-                btn.innerText = key;
+                btn.innerHTML = key;
                 btn.addEventListener('click', (e) => {
                     e.preventDefault();
                     obj[property][key]();
@@ -288,62 +324,74 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
             ulElem.appendChild(li);
 
             index += 1;
-        }
+        };
+
+        Object.keys(obj[property]).forEach(buidElementFn);
+
+        addPropChangeEvent(obj, property, (oldValue: any, newVale: any) => {
+            ulElem.innerHTML = '';
+            Object.keys(obj[property]).forEach(buidElementFn);
+            console.log('change');
+        });
 
         const descriptionElem = document.createElement('span');
-        descriptionElem.innerText = description;
+        descriptionElem.innerHTML = description;
 
-        const group: IFormElementGroup = {
-            property: property,
-            type: 'object',
-            label: labelElem,
-            arrayItems: ulElem,
-            description: descriptionElem
-        }
-        return group;
+        // create the list item
+        const listItemElem = document.createElement('li');
+        listItemElem.classList.add(`fb-element-object`);
+        formList.appendChild(listItemElem);
+
+        listItemElem.appendChild(labelElem);
+        listItemElem.appendChild(ulElem);
+        listItemElem.appendChild(descriptionElem);
+        
     }
 
-    const createFieldFactory = (data: IElementData): IFormElementGroup => {
+    const createFieldFactory = (data: IElementData) => {
 
         // Create the input
         switch (data.inputType) {
-            case 'input':
+            case FormElementType.INPUT:
                 const type = dataTypeInputTypeLookup[data.dataType];
-                return createInputField(data.property, null, type, data.label, data.description);
-            case 'select':
-                return createSelectField(data.options, data.label, data.property, data.description);
-            case 'markdown': 
-                return createMarkdownField(data.property);
-            case 'button': 
-                return createButtonField(data.label, data.property);
-            case 'array':
-                return createArrayField(data.label, data.property, data.description);
-            case 'object':
-                return createObjectField(data.label, data.property, data.description);
+                createInputField(data.property, null, type, data.label, data.description);
+                break;
+            case FormElementType.DROPDOWN:
+                createSelectField(data.options, data.label, data.property, data.description);
+                break;
+            case FormElementType.MARKDOWN: 
+                createMarkdownField(data.property);
+                break;
+            case FormElementType.BUTTON: 
+                createButtonField(data.label, data.property);
+                break;
+            case FormElementType.ARRAY:
+                createArrayField(data.label, data.property, data.description);
+                break;
+            case FormElementType.OBJECT:
+                createObjectField(data.label, data.property, data.description);
+                break;
             default:
-                return null;
+                break;
         }
     }
 
-    const properties: string[] = Reflect.getMetadata("editableProperties", obj) || [];
-    const type_overrides = Reflect.getMetadata("type_overrides", obj) || {};
-    const select_options = Reflect.getMetadata("select_options", obj) || {};
-    const displayNames = Reflect.getMetadata('displayName', obj);
-    const descriptions = Reflect.getMetadata('descriptions', obj);
-
-    const formItems: IFormElementGroup[] = [];
+    const properties: IFormData[] = Reflect.getMetadata("editableProperties", obj) || [];
 
     // create the input elements
     for (let property of properties) {
 
-        const dataType = Reflect.getMetadata("design:type", obj, property) || property;
-        const inputType = type_overrides[property] || dataTypeElementTypeLookup[dataType.name];
-        const displayName = displayNames[property] || property;
-        const description = descriptions[property] || '';
-        const options = select_options[property] || [];
+        const key = property.propertyKey;
 
-        const formItem = createFieldFactory({
-            property,
+        const dataType = Reflect.getMetadata("design:type", obj, key) || property;
+        const inputType = property.options.type || dataTypeElementTypeLookup[dataType.name];
+        const displayName = property.options.label !== undefined ? property.options.label : key;
+        const description = property.options.description || '';
+
+        const options: any[] = property.options.dropdown_options;
+
+        createFieldFactory({
+            property: key,
             arrIndex: null,
             dataType: dataType.name,
             inputType,
@@ -351,121 +399,17 @@ export function generateForm(parentElement: HTMLElement, obj: any, onFormChange:
             description,
             options
         });
-
-        formItems.push(formItem);
-
     }
-    
-
-    const form = document.createElement("form");
-    parentElement.innerHTML = '';
-    parentElement.appendChild(form);
-
-    const formList = document.createElement('ul');
-    form.appendChild(formList);
-
-    // construct the layout
-    for(const item of formItems) {
-
-        const listItemElem = document.createElement('li');
-        listItemElem.classList.add(`fb-element-${item.type}`)
-        formList.appendChild(listItemElem);
-
-        switch(item.type) {
-            case 'text':
-            case 'date':
-            case 'number':
-                listItemElem.appendChild(item.label);
-                listItemElem.appendChild(item.input);
-                listItemElem.appendChild(item.description);
-                break;
-            case 'select':
-                listItemElem.appendChild(item.label);
-                listItemElem.appendChild(item.select);
-                listItemElem.appendChild(item.description);
-                break;
-            case 'checkbox':
-                listItemElem.appendChild(item.input);
-                listItemElem.appendChild(item.label);
-                listItemElem.appendChild(item.description);
-                break;
-            case 'markdown': 
-                listItemElem.appendChild(item.markdown);
-                break;
-            case 'button': 
-                listItemElem.appendChild(item.button);
-                break;
-            case 'array':
-                listItemElem.appendChild(item.label);
-                listItemElem.appendChild(item.arrayItems);
-                listItemElem.appendChild(item.description);
-                break;
-            case 'object':
-                listItemElem.appendChild(item.label);
-                listItemElem.appendChild(item.arrayItems);
-                listItemElem.appendChild(item.description);
-                break;
-            default:
-                break;
-        }
-    }
-
-    // pool for changes and update the input
-    // setInterval(() => {
-    //     console.log('checking');
-
-    //     for(const item of formItems) {
-    //         switch(item.type) {
-    //             case 'text':
-    //                 item.input.value = obj[item.property];
-    //                 break;
-    //             case 'date':
-    //                 item.input.valueAsDate = obj[item.property];
-    //                 break;
-    //             case 'number':
-    //                 item.input.valueAsNumber = obj[item.property];
-    //                 break;
-    //             case 'select':
-    //                 item.select.value = obj[item.property];
-    //                 break;
-    //             case 'checkbox':
-    //                 item.input.checked = obj[item.property];
-    //                 break;
-    //             case 'array':
-    //                 item.arrayItems.innerHTML = '';
-    //                 obj[item.property].forEach((element: any) => {
-    //                     const li = document.createElement('li');
-    //                     const input = document.createElement('input');
-    //                     input.value = element;
-    //                     li.appendChild(input);
-    //                     item.arrayItems.appendChild(li);
-    //                 });
-    //                 break;
-    //             case 'markdown': 
-    //                 break;
-    //             case 'button':
-    //                 break;
-    //         }
-    //     }
-
-    // }, 100);
-    
 }
 
 function escape(str: string) {
-
-
     const lines = str.split('\n');
     if(lines.length === 1)
         return lines[0];
-
 
     const initialSpaceLength = lines[1].length - (lines[1] as any).trimStart().length;
     for(let i=0; i<lines.length; i++) {
         lines[i] = lines[i].substr(initialSpaceLength);
     }
     return lines.join('\n');
-
 }
-
-

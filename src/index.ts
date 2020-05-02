@@ -2,7 +2,7 @@
 import RunDemo from './demos';
 import { App } from './engine/app';
 
-import { generateForm, editable, displayName, description, selectEnumOptions, markdown } from './engine/forms';
+import { generateForm, editable, displayName, description, selectEnumOptions, markdown, FormElementType } from './engine/forms';
 
 // ============================================================================
 // Launch the canvas demo
@@ -96,44 +96,44 @@ enum EItemTest
 
 class TestForm {
     
-    @editable()
-    @displayName('Name') 
-    @description("The quick brown fox")
+    @editable({
+        label: 'Name',
+        description: 'The quick brown fox'
+    })
     name: string = "hello world";
 
-    @editable()
-    @displayName('Do you smoke')
-    @description("The quick brown fox")
+    @editable({
+        label: 'Do you smoke',
+        description: 'The quick brown fox'
+    })
     smokes: boolean = true;
 
-    @editable()
-    @displayName('Family') 
-    @description("The quick brown fox")
+    @editable({
+        label: 'Family',
+        description: 'The quick brown fox'
+    })
     family: string[] = ['mum', 'dad', 'joel'];
 
-    @editable()
-    @description("The quick brown fox")
-    booleans: number[] = [10, 20, 30];
+    @editable({
+        label: 'Numbers',
+        description: 'The quick brown fox'
+    })
+    numbers: number[] = [10, 20, 30];
 
-    @editable()
-    @displayName('Age')
-    @description("the quick brown fox")
+    @editable({
+        label: null
+    })
     age: number = 18;
 
-
     @editable()
-    @description("the quick brown fox")
     dob: Date = new Date();
 
-    @editable()
-    @selectEnumOptions(EItemTest)
-    @description("the quick brown fox")
-    options: EItemTest = EItemTest.OPTION_ONE;
+    @editable({ dropdown_enum_options: EItemTest})
+    options: number = EItemTest.OPTION_ONE;
 
-
-    @editable()
-    @markdown()
-    @description("the quick brown fox")
+    @editable({
+        type: FormElementType.MARKDOWN
+    })
     info: string = `
     # Hello world
 
@@ -148,19 +148,11 @@ class TestForm {
     `;
 
     @editable()
-    @description("Close")
-    @displayName('CLOSE')
     close() {
-        const docsElem = document.querySelector('.docs-container');
-        const canvasElem = document.querySelector('#canvas');
-        docsElem.classList.remove('open');
-        canvasElem.classList.remove('push-right');
-        console.log(docsElem);
         alert('hello');
     }
 
     @editable()
-    @displayName(' ')
     buttons: { [key:string]: ()=>void } = {
         one: () => {
             console.log('hello')
@@ -174,7 +166,6 @@ class TestForm {
     }
 
     @editable()
-    @displayName(' ')
     people: { [key:string]: string } = {
         one: 'aaron',
         two: 'joel'
@@ -185,5 +176,10 @@ const docsElem = document.querySelector('.docs') as HTMLElement;
 const testFormInstance = new TestForm();
 
 generateForm(docsElem, testFormInstance, () =>{
-    console.log(testFormInstance.family);
+    testFormInstance.name += '_a';
 });
+
+setInterval(() => {
+    testFormInstance.age += 1;
+    testFormInstance.people = {...testFormInstance.people, one: testFormInstance.age.toString()};
+}, 1000)

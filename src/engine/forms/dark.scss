@@ -66,11 +66,11 @@ $rounded: 0px;
                 border-radius: $rounded;
                 margin-bottom: $groupSpacing;
                 
-                &:hover {
-                    -webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
-                    -moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
-                    box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
-                }
+                // &:hover {
+                //     -webkit-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                //     -moz-box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                //     box-shadow: 0px 0px 5px 0px rgba(0,0,0,0.5);
+                // }
 
 
 
@@ -85,6 +85,10 @@ $rounded: 0px;
                     padding-bottom: 0px;
                     font-size: 10px;
                     border-radius: $rounded - 2px;
+
+                    &:empty{
+                        display: none
+                    }
                 }
 
                 >input {

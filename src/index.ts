@@ -39,25 +39,38 @@ window.onload = (() => {
 // APP MENU
 // ============================================================================
 {
-    const menuBtn = document.querySelector('.menu-btn');
+    const menuBtn = document.querySelector('#main-menu-button');
+    const mainMenuContainerElem = document.querySelector('.main-menu-container');
+    const menuMenuElem = document.querySelector('.main-menu') as HTMLElement;
+
+    const docsBtn = document.querySelector('#docs-menu-button');
+    const docsMenuContainerElem = document.querySelector('.docs-menu-container');
+
     const pageNav = document.querySelector('.page-nav');
     const menuBackdrop = document.querySelector('.backdrop');
 
-    const docsElem = document.querySelector('.docs-container');
+    
     const canvasElem = document.querySelector('#canvas');
 
     let menuOpen = false;
+    let docsOpen = false;
+
     menuBtn.addEventListener('click', () => {
-        hamburgerMenu(!menuOpen);
+        mainMenuOpen(!menuOpen);
+    });
+    docsBtn.addEventListener('click', () => {
+        console.log('clicky');
+        docsMenuOpen(!docsOpen);
     });
     menuBackdrop.addEventListener('click', () => {
-        hamburgerMenu(!menuOpen);
+        mainMenuOpen(!menuOpen);
     });
 
-    const hamburgerMenu = (visible: boolean) => {
+
+    const mainMenuOpen = (visible: boolean) => {
         menuOpen = visible;
-        if(menuOpen){ 
-            docsElem.classList.add('open');
+        if(menuOpen) { 
+            mainMenuContainerElem.classList.add('open');
             canvasElem.classList.add('push-right-200');
             pageNav.classList.add('push-right-400');
 
@@ -65,7 +78,7 @@ window.onload = (() => {
             menuBackdrop.classList.add('active');
         }
         else {
-            docsElem.classList.remove('open');
+            mainMenuContainerElem.classList.remove('open');
             canvasElem.classList.remove('push-right-200');
             pageNav.classList.remove('push-right-400');
 
@@ -74,30 +87,25 @@ window.onload = (() => {
         }
     }
 
+    const docsMenuOpen = (visible: boolean) => {
+        docsOpen = visible;
+        if(docsOpen) { 
+            docsMenuContainerElem.classList.add('open');
+            docsBtn.classList.add('open')
+            canvasElem.classList.add('push-left-200');
+            pageNav.classList.add('push-left-400');
+        }
+        else {
+            docsMenuContainerElem.classList.remove('open');
+            docsBtn.classList.remove('open')
+            canvasElem.classList.remove('push-left-200');
+            pageNav.classList.remove('push-left-400');
+        }
+    }
+
 // ============================================================================
 // TEST FORMS GENERATION
 // ============================================================================
-
-    enum EItemTest
-    {
-        OPTION_ONE,
-        OPTION_TWO,
-        OPTION_THREE
-    }
-
-    class Vec3
-    {
-        x: number = 0;
-        y: number = 0;
-        z: number = 0;
-    }
-
-    interface IVec3
-    {
-        x: number;
-        y: number;
-        z: number;
-    }
 
     class TestForm {
 
@@ -105,16 +113,10 @@ window.onload = (() => {
             type: PropElementType.MARKDOWN
         })
         info: string = `
-        # Hello world
+        # ARCGL
 
-        A Simple C++ example hello world program
-
-            #include <iostream>
-            int main(int argc, char **argv)
-            {
-                std::cout << "hello world" << std::endl;
-                return 0;
-            }
+        A simple typescript / webgl framework
+        for creating interesting interactive demos
         `;
 
         @editable({
@@ -124,27 +126,26 @@ window.onload = (() => {
         buttons: { [key:string]: ()=>void } = {
             RayCast: () => {
                 window.location.hash = 'RayCastingDemo';
-                hamburgerMenu(false);
+            },
+            SpriteRotationAroundOrigin: () => {
+                window.location.hash = 'RectRotationDemo';
             },
             RenderToTexture: () => {
                 window.location.hash = 'RenderTextureDemo';
-                hamburgerMenu(false);
             },
             LightBender: () => {
                 window.location.hash = 'LightBender';
-                hamburgerMenu(false);
             }
         }
     }
 
-    const docsContainerElem = document.querySelector('.docs') as HTMLElement;
+    
     const testFormInstance = new TestForm();
 
-    console.log(testFormInstance);
+    console.log( JSON.stringify(testFormInstance) );
 
-    generateForm(docsContainerElem, testFormInstance, () => {
+    generateForm(menuMenuElem, testFormInstance, () => {
         console.log(testFormInstance);
     });
-
 
 }

@@ -1,7 +1,5 @@
+@import url('https://fonts.googleapis.com/css?family=Roboto&display=swap');
 
-// $bg2: #1d2025;
-// $bg1: #1f2933;
-// $bg0: #323f4b;
 
 $bg2: #1b1b1b;
 $bg1: #363636;
@@ -14,26 +12,16 @@ $groupSpacing: 20px;
 
 $rounded: 0px;
 
-.docs-container {
-
-    position: absolute;
-    width: 400px;
-    height: 100vh;
-    left: 0px;
-    top: 0px;
-    background: whitesmoke;
-    transition:  all 0.15s ease-in-out;
-    overflow-y: scroll;
+.dynamic-forms {
     box-sizing: border-box;
-
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: 'Roboto', sans-serif;
 }
 
-.docs-container::-webkit-scrollbar {
+.dynamic-forms::-webkit-scrollbar {
     display: none;
 }
 
-.docs-container.dark {
+.dynamic-forms.dark {
     background: $bg0;
 
     form {

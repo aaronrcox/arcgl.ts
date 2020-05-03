@@ -1,0 +1,210 @@
+@import url("https://fonts.googleapis.com/css?family=Roboto&display=swap");
+.dynamic-forms {
+  box-sizing: border-box;
+  font-family: "Roboto", sans-serif;
+}
+
+.dynamic-forms::-webkit-scrollbar {
+  display: none;
+}
+
+.dynamic-forms.dark {
+  background: #464646;
+}
+.dynamic-forms.dark form {
+  padding: 20px;
+}
+.dynamic-forms.dark form > ul {
+  list-style: none;
+  padding: 0px;
+  margin: 0px;
+  color: whitesmoke;
+}
+.dynamic-forms.dark form > ul input {
+  width: 100%;
+  padding: 9px;
+  background: transparent;
+  box-sizing: border-box;
+  border: 0px;
+  color: whitesmoke;
+  font-size: 14px;
+}
+.dynamic-forms.dark form > ul input:focus {
+  outline: none;
+}
+.dynamic-forms.dark form > ul > li {
+  background: #363636;
+  border: 1px solid #1b1b1b;
+  border-radius: 0px;
+  margin-bottom: 20px;
+}
+.dynamic-forms.dark form > ul > li > label {
+  display: block;
+  position: absolute;
+  margin-top: -8px;
+  margin-left: 5px;
+  background: #363636;
+  padding: 5px;
+  padding-top: 3px;
+  padding-bottom: 0px;
+  font-size: 10px;
+  border-radius: -2px;
+}
+.dynamic-forms.dark form > ul > li > label:empty {
+  display: none;
+}
+.dynamic-forms.dark form > ul > li > input {
+  padding-bottom: 5px;
+}
+.dynamic-forms.dark form > ul > li > span {
+  background: #1b1b1b;
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  padding: 3px;
+  text-align: center;
+  color: #C0C0C0;
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 11px;
+  clear: both;
+}
+.dynamic-forms.dark form > ul > li > span:empty {
+  height: 1px;
+  padding: 0px;
+  margin: 0px;
+}
+.dynamic-forms.dark form > ul > li.fb-element-checkbox > label {
+  position: unset;
+  display: unset;
+  margin: 0px;
+  margin-left: 2px;
+  margin-top: 5px;
+  font-size: 12px;
+  float: left;
+}
+.dynamic-forms.dark form > ul > li.fb-element-checkbox > input {
+  width: 16px;
+  height: 24px;
+  float: left;
+  margin-left: 8px;
+}
+.dynamic-forms.dark form > ul > li.fb-element-checkbox > span:before {
+  content: "";
+}
+.dynamic-forms.dark form > ul > li.fb-element-select > select {
+  border: 0px;
+  padding: 9px;
+  padding-bottom: 5px;
+  background: transparent;
+  outline: none;
+  color: whitesmoke;
+  width: 100%;
+  box-sizing: border-box;
+}
+.dynamic-forms.dark form > ul > li.fb-element-select > select > option {
+  background: #464646;
+}
+.dynamic-forms.dark form > ul > li.fb-element-array {
+  border-right: 0px solid #1b1b1b;
+}
+.dynamic-forms.dark form > ul > li.fb-element-array > ul {
+  list-style: none;
+  padding: 0px;
+  margin: 0px;
+  display: flex;
+  flex-wrap: wrap;
+}
+.dynamic-forms.dark form > ul > li.fb-element-array > ul > li {
+  border-bottom: 1px solid #1b1b1b;
+  border-right: 1px solid #1b1b1b;
+  flex: 1;
+}
+.dynamic-forms.dark form > ul > li.fb-element-array > ul > li.break {
+  flex-basis: 100%;
+  height: 0;
+  border: none;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object {
+  border-right: 0px solid #1b1b1b;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul {
+  list-style: none;
+  padding: 0px;
+  margin: 0px;
+  color: whitesmoke;
+  display: flex;
+  flex-wrap: wrap;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul > li {
+  border-bottom: 1px solid #1b1b1b;
+  border-right: 1px solid #1b1b1b;
+  flex: 1;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul > li.break {
+  flex-basis: 100%;
+  height: 0;
+  border: none;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul > li input {
+  padding-top: 2px;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul > li label {
+  color: #efb44e;
+  font-size: x-small;
+  margin-left: 10px;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul button {
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  border: none;
+  padding: 9px;
+  color: whitesmoke;
+  text-align: left;
+  cursor: pointer;
+}
+.dynamic-forms.dark form > ul > li.fb-element-object > ul button:hover {
+  background: #1b1b1b;
+  color: #efb44e;
+}
+.dynamic-forms.dark form > ul > li.fb-element-markdown {
+  border: 0px;
+  background: transparent;
+}
+.dynamic-forms.dark form > ul > li.fb-element-markdown:hover {
+  box-shadow: none;
+}
+.dynamic-forms.dark form > ul > li.fb-element-markdown pre {
+  background: #363636;
+  color: whitesmoke;
+  padding: 10px;
+}
+.dynamic-forms.dark form > ul > li.fb-element-markdown hr {
+  color: whitesmoke;
+  background: whitesmoke;
+}
+.dynamic-forms.dark form > ul > li.fb-element-button {
+  background: none;
+  border: none;
+}
+.dynamic-forms.dark form > ul > li.fb-element-button:hover {
+  box-shadow: none;
+}
+.dynamic-forms.dark form > ul > li.fb-element-button button {
+  width: 100%;
+  background: #1b1b1b;
+  outline: none;
+  border: 1px solid #1b1b1b;
+  border-radius: 5px;
+  padding: 10px;
+  color: whitesmoke;
+}
+.dynamic-forms.dark form > ul > li.fb-element-button button:hover {
+  color: #efb44e;
+  cursor: pointer;
+  -webkit-box-shadow: 0px 0px 5px 0px rgba(0, 0, 0, 0.5);
+  -moz-box-shadow: 0px 0px 5px 0px rgba(0, 0, 0, 0.5);
+  box-shadow: 0px 0px 5px 0px rgba(0, 0, 0, 0.5);
+}
+
+/*# sourceMappingURL=/src.77de5100.css.map */

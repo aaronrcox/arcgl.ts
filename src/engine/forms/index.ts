@@ -4,7 +4,6 @@ import './dark.scss';
 
 import marked = require('marked');
 
-
 export enum PropElementType {
     INPUT,
     DROPDOWN,

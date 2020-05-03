@@ -119,7 +119,7 @@ window.onload = (() => {
 
         @editable({
             label: '',
-            description: 'Demos'
+            description: 'Demos',
         })
         buttons: { [key:string]: ()=>void } = {
             RayCast: () => {
@@ -135,27 +135,6 @@ window.onload = (() => {
                 hamburgerMenu(false);
             }
         }
-
-        // @editable()
-        // firstName: string = 'Aaron';
-
-        // @editable()
-        // pos: Vec3 = new Vec3();
-
-        // @editable()
-        // dir: IVec3 = {x: 0, y: 0, z: 0};
-
-        // @editable({
-        //     items_per_row: 3
-        // })
-        // vel: IVec3 = {x: 0, y: 0, z: 0};
-
-        // @editable({
-        //     description: 'transformation matrix',
-        //     items_per_row: 4
-        // })
-        // mat: number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16];
-
     }
 
     const docsContainerElem = document.querySelector('.docs') as HTMLElement;
